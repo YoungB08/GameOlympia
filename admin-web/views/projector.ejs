@@ -6,7 +6,7 @@
   <title><%= overlay ? 'Overlay' : 'Projector' %> - <%= room.room_code %></title>
   <link rel="stylesheet" href="/public/broadcast.css">
 </head>
-<body class="broadcast <%= overlay ? 'overlay' : '' %>">
+<body class="broadcast <%= overlay ? 'overlay' : '' %>" data-screen-role="<%= screenRole %>">
   <div class="projector-stage">
     <div class="projector-bg" id="projectorBg"></div>
     <div class="top-line" style="position:absolute;left:5%;right:5%;top:5%;z-index:2">
@@ -22,11 +22,36 @@
       <% [1,2,3,4].forEach((tile) => { %><div class="puzzle-tile" data-tile="<%= tile %>"></div><% }) %>
     </div>
   </div>
-  <script>window.ROOM_CODE = "<%= room.room_code %>";</script>
+  <script>
+    window.ROOM_CODE = "<%= room.room_code %>";
+    window.SCREEN_ROLE = "<%= screenRole %>";
+  </script>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/public/realtime-client.js"></script>
+  <script src="/public/realtime-client.js?v=20260723-roles-ms"></script>
   <script>
     const $ = (id) => document.getElementById(id);
+    function speedFrameIndex(state) {
+      const timer = state.timer || {};
+      const totalMs = Number(timer.durationMs || Number(timer.seconds || 0) * 1000);
+      const remainingMs = Number(timer.remainingMs ?? Number(timer.remaining || 0) * 1000);
+      const elapsedMs = Math.max(0, totalMs - remainingMs);
+      const durations = (state.speed?.imageDurations || []).map(Number).filter((value) => value > 0);
+      if (durations.length) {
+        let cursor = 0;
+        for (let index = 0; index < durations.length; index += 1) {
+          cursor += durations[index] * 1000;
+          if (elapsedMs < cursor) return index;
+        }
+        return durations.length - 1;
+      }
+      return totalMs > 0 ? Math.min(3, Math.floor(elapsedMs / Math.max(1, totalMs / 4))) : 0;
+    }
+    function currentStageMedia(state) {
+      if (state.round === "speed" && state.speed?.imageSequence?.length) {
+        return state.speed.imageSequence[Math.min(speedFrameIndex(state), state.speed.imageSequence.length - 1)] || "";
+      }
+      return state.question?.mediaUrl || state.puzzle?.imageUrl || "";
+    }
     window.renderRealtimeState = function (state) {
       $("contestTitle").textContent = state.contestTitle || "Olympia";
       $("roundName").textContent = String(state.round || "setup").toUpperCase();
@@ -34,16 +59,16 @@
       $("projectorScores").innerHTML = (state.candidates || []).slice(0, state.scoring?.candidateCount || 4).map((c) => (
         `<div class="projector-score-card"><div class="diamond-score"><span>${c.score}</span></div><div class="diamond-name">${c.display_name}</div></div>`
       )).join("");
-      const media = state.question?.mediaUrl || state.puzzle?.imageUrl || "";
+      const media = currentStageMedia(state);
       $("projectorBg").style.backgroundImage = media ? `linear-gradient(rgba(1,4,9,.35), rgba(1,4,9,.35)), url("${media}")` : "";
       $("projectorBg").style.backgroundSize = "cover";
       $("projectorBg").style.filter = state.puzzle?.revealed?.every(Boolean) ? "blur(0)" : "blur(15px)";
       document.querySelectorAll(".puzzle-tile").forEach((tile, index) => {
         tile.classList.toggle("revealed", Boolean(state.puzzle?.revealed?.[index]));
       });
-      const total = Number(state.timer?.seconds || 0);
-      const remaining = Number(state.timer?.remaining || 0);
-      const pct = total > 0 ? Math.max(0, Math.min(100, remaining / total * 100)) : 100;
+      const totalMs = Number(state.timer?.durationMs || Number(state.timer?.seconds || 0) * 1000);
+      const remainingMs = Number(state.timer?.remainingMs ?? Number(state.timer?.remaining || 0) * 1000);
+      const pct = totalMs > 0 ? Math.max(0, Math.min(100, remainingMs / totalMs * 100)) : 100;
       $("timerBar").style.width = `${pct}%`;
       $("timerBar").classList.toggle("warn", pct <= 50 && pct > 25);
       $("timerBar").classList.toggle("danger", pct <= 25);

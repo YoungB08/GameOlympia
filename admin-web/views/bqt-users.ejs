@@ -1,0 +1,94 @@
+<%- include('partials/header', { user, tables, current }) %>
+
+<section class="page-head">
+  <div>
+    <h1>Tài khoản BQT</h1>
+    <p>Admin tạo user/pass cho BQT và gán mỗi tài khoản vào một server cụ thể.</p>
+  </div>
+</section>
+
+<% if (error) { %>
+  <div class="alert"><%= error %></div>
+<% } %>
+
+<form class="panel form-grid admin-form-card" method="post" action="/admin/bqt-users">
+  <label>
+    <span>Username</span>
+    <input name="username" required autocomplete="off">
+  </label>
+  <label>
+    <span>Tên hiển thị</span>
+    <input name="display_name" autocomplete="off">
+  </label>
+  <label>
+    <span>Password</span>
+    <input name="password" type="password" required autocomplete="new-password">
+  </label>
+  <label>
+    <span>Server được quản lý</span>
+    <select name="server_slot_id" required>
+      <option value="">Chọn server</option>
+      <% servers.forEach((server) => { %>
+        <option value="<%= server.id %>"><%= server.display_name %> - <%= server.status %></option>
+      <% }) %>
+    </select>
+  </label>
+  <label>
+    <span>Trạng thái</span>
+    <select name="is_active">
+      <option value="1">Đang hoạt động</option>
+      <option value="0">Khóa</option>
+    </select>
+  </label>
+  <div class="form-actions">
+    <button class="primary" type="submit">Tạo tài khoản BQT</button>
+  </div>
+</form>
+
+<div class="panel table-panel">
+  <table>
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Tên hiển thị</th>
+        <th>Server</th>
+        <th>Trạng thái</th>
+        <th>Thao tác</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% users.forEach((account) => { %>
+        <tr>
+          <form method="post" action="/admin/bqt-users/<%= account.id %>/update">
+            <td><input name="username" value="<%= account.username %>" required></td>
+            <td><input name="display_name" value="<%= account.display_name || account.username %>"></td>
+            <td>
+              <select name="server_slot_id" required>
+                <% servers.forEach((server) => { %>
+                  <option value="<%= server.id %>" <%= Number(server.id) === Number(account.server_slot_id) ? 'selected' : '' %>>
+                    <%= server.display_name %> - <%= server.status %>
+                  </option>
+                <% }) %>
+              </select>
+            </td>
+            <td>
+              <select name="is_active">
+                <option value="1" <%= account.is_active ? 'selected' : '' %>>Đang hoạt động</option>
+                <option value="0" <%= !account.is_active ? 'selected' : '' %>>Khóa</option>
+              </select>
+              <input name="password" type="password" placeholder="Mật khẩu mới nếu cần" autocomplete="new-password">
+            </td>
+            <td class="actions">
+              <button class="primary" type="submit">Lưu</button>
+          </form>
+              <form method="post" action="/admin/bqt-users/<%= account.id %>/delete" onsubmit="return confirm('Xóa tài khoản BQT này?')">
+                <button type="submit">Xóa</button>
+              </form>
+            </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/footer') %>

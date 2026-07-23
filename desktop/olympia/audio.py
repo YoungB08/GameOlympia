@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import unquote, urljoin, urlparse
 
 from .config import SOUND_DIR
 
@@ -13,6 +14,8 @@ except Exception:  # pragma: no cover - multimedia plugins vary by host
     QSoundEffect = None
     QUrl = None
 
+
+DEFAULT_VOLUME = 0.5
 
 SOUND_PACK: dict[str, str] = {
     "starting.startRound": "Starting/StartRound.mp3",
@@ -58,6 +61,43 @@ SOUND_PACK: dict[str, str] = {
 }
 
 
+def normalized_volume(value: object = DEFAULT_VOLUME) -> float:
+    try:
+        parsed = float(value if value is not None else DEFAULT_VOLUME)
+    except (TypeError, ValueError):
+        parsed = DEFAULT_VOLUME
+    return max(0.0, min(1.0, parsed))
+
+
+def local_sound_path(media_url: str | None) -> Path | None:
+    raw = str(media_url or "").strip()
+    if not raw:
+        return None
+    if not raw.lower().split("?", 1)[0].split("#", 1)[0].endswith(".mp3"):
+        return None
+    parsed = urlparse(raw)
+    resource_path = unquote(parsed.path if parsed.scheme else raw)
+    resource_path = resource_path.lstrip("/")
+    if not resource_path.lower().startswith("sounds/"):
+        return None
+    candidate = SOUND_DIR / resource_path[len("sounds/"):]
+    return candidate if candidate.exists() else None
+
+
+def absolute_media_url(media_url: str | None, base_url: str = "") -> str:
+    raw = str(media_url or "").strip()
+    if not raw:
+        return ""
+    if not raw.lower().split("?", 1)[0].split("#", 1)[0].endswith(".mp3"):
+        return ""
+    parsed = urlparse(raw)
+    if parsed.scheme:
+        return raw
+    if not base_url:
+        return raw
+    return urljoin(f"{base_url.rstrip('/')}/", raw)
+
+
 class SoundBank:
     def __init__(self) -> None:
         self._effects: dict[str, QSoundEffect] = {}
@@ -69,7 +109,7 @@ class SoundBank:
             if path.exists() and QSoundEffect is not None:
                 effect = QSoundEffect()
                 effect.setSource(QUrl.fromLocalFile(str(path)))
-                effect.setVolume(0.85)
+                effect.setVolume(DEFAULT_VOLUME)
                 self._effects[name] = effect
         if QMediaPlayer is not None and QAudioOutput is not None:
             for key, relative in SOUND_PACK.items():
@@ -77,7 +117,7 @@ class SoundBank:
                 if not path.exists():
                     continue
                 output = QAudioOutput()
-                output.setVolume(0.85)
+                output.setVolume(DEFAULT_VOLUME)
                 player = QMediaPlayer()
                 player.setAudioOutput(output)
                 player.setSource(QUrl.fromLocalFile(str(path)))
@@ -96,5 +136,39 @@ class SoundBank:
             effect.play()
 
 
+class MediaPlayback:
+    def __init__(self) -> None:
+        self._output: QAudioOutput | None = None
+        self._player: QMediaPlayer | None = None
+        if QMediaPlayer is None or QAudioOutput is None:
+            return
+        self._output = QAudioOutput()
+        self._output.setVolume(DEFAULT_VOLUME)
+        self._player = QMediaPlayer()
+        self._player.setAudioOutput(self._output)
+
+    def play_media(self, media_url: str | None, base_url: str = "", volume: float = DEFAULT_VOLUME) -> None:
+        if self._player is None or QUrl is None:
+            return
+        local_path = local_sound_path(media_url)
+        if local_path:
+            source = QUrl.fromLocalFile(str(local_path))
+        else:
+            resolved_url = absolute_media_url(media_url, base_url)
+            if not resolved_url:
+                return
+            source = QUrl(resolved_url)
+        self._player.stop()
+        if self._output is not None:
+            self._output.setVolume(normalized_volume(volume))
+        self._player.setSource(source)
+        self._player.setPosition(0)
+        self._player.play()
+
+    def stop(self) -> None:
+        if self._player is not None:
+            self._player.stop()
+
+
 def known_sound_files() -> list[Path]:
-    return sorted(SOUND_DIR.rglob("*.mp3")) + sorted(SOUND_DIR.glob("*.wav"))
+    return sorted(SOUND_DIR.rglob("*.mp3"))

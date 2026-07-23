@@ -15,6 +15,49 @@
 </section>
 
 <section class="two-col">
+  <% if (user && user.role !== 'bqt') { %>
+    <div class="panel">
+      <h2>Nạp bộ đề / gói trận đấu</h2>
+      <p class="muted">Nhận file Excel hoặc ZIP chứa Excel + Sounds/Resources/assets.</p>
+      <form class="form-grid compact-admin-form" method="post" action="/admin/import" enctype="multipart/form-data">
+        <label>
+          <span>Bộ đề ID</span>
+          <input name="question_set_id" type="number" value="1" min="1">
+        </label>
+        <label>
+          <span>Định dạng</span>
+          <select name="format">
+            <option value="q2t_standard">Chuẩn 5 phần thi</option>
+            <option value="lct3">LCT3</option>
+          </select>
+        </label>
+        <label class="span-2">
+          <span>File .xlsx hoặc .zip</span>
+          <input name="file" type="file" accept=".xlsx,.zip" required>
+        </label>
+        <div class="form-actions span-2">
+          <button class="primary" type="submit">Nạp đề</button>
+          <a class="secondary" href="/templates/q2t_standard.xlsx">Template Excel</a>
+          <a class="secondary" href="/templates/lct3.xlsx">Template LCT3</a>
+        </div>
+      </form>
+    </div>
+  <% } %>
+  <div class="panel">
+    <h2>Kho tài nguyên</h2>
+    <p class="muted">Tự động đọc theo cấu trúc thư mục chuẩn.</p>
+    <div class="asset-summary">
+      <% (assetCatalog || []).forEach((root) => { %>
+        <a class="asset-chip" href="/api/assets">
+          <strong><%= root.title %></strong>
+          <span><%= root.files.length %> tệp</span>
+        </a>
+      <% }) %>
+    </div>
+  </div>
+</section>
+
+<section class="two-col">
   <div class="panel">
     <h2>Phòng thi gần đây</h2>
     <table>
@@ -48,5 +91,24 @@
     </table>
   </div>
 </section>
+
+<% if (user && user.role !== 'bqt') { %>
+  <section class="panel">
+    <h2>Lịch sử nạp đề gần đây</h2>
+    <table>
+      <thead><tr><th>File</th><th>Định dạng</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <% (importJobs || []).forEach((job) => { %>
+          <tr>
+            <td><%= job.file_name %></td>
+            <td><%= job.format_key %></td>
+            <td><span class="pill"><%= job.status %></span></td>
+            <td><%= job.message || '' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </section>
+<% } %>
 
 <%- include('partials/footer') %>

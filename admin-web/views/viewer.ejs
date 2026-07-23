@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Viewer - <%= room.room_code %></title>
+  <link rel="stylesheet" href="/public/broadcast.css">
+</head>
+<body class="broadcast" data-screen-role="<%= screenRole %>">
+  <main class="client-shell viewer-shell">
+    <div class="client-content viewer-content">
+      <div class="top-line">
+        <div class="badge" id="viewerTitle">Olympia</div>
+        <div class="score-frame"><span id="viewerRole"><%= screenRole %></span> · <span id="viewerRound">SETUP</span></div>
+      </div>
+
+      <section class="viewer-stage">
+        <div>
+          <div class="viewer-timer" id="viewerTimer">0</div>
+          <div class="timer-shell"><div class="timer-bar" id="viewerTimerBar"></div></div>
+        </div>
+        <div class="question-box viewer-question" id="viewerQuestion">Đang chờ kỹ thuật...</div>
+        <div class="question-box viewer-answer" id="viewerAnswer"></div>
+      </section>
+
+      <section class="score-bars viewer-score-list" id="viewerScores"></section>
+    </div>
+  </main>
+  <script>
+    window.ROOM_CODE = "<%= room.room_code %>";
+    window.SCREEN_ROLE = "<%= screenRole %>";
+  </script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/public/realtime-client.js?v=20260723-roles-ms"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    function timerText(state) {
+      const timer = state.timer || {};
+      const remainingMs = Number(timer.remainingMs ?? Number(timer.remaining || 0) * 1000);
+      if (state.round === "speed" && Number.isFinite(remainingMs)) return (remainingMs / 1000).toFixed(2);
+      return String(Math.ceil(Math.max(0, remainingMs) / 1000));
+    }
+    window.renderRealtimeState = function (state) {
+      $("viewerTitle").textContent = state.contestTitle || "Olympia";
+      $("viewerRound").textContent = String(state.round || "setup").toUpperCase();
+      $("viewerTimer").textContent = timerText(state);
+      $("viewerQuestion").textContent = state.question?.visible ? (state.question.text || "") : "Đang chờ kỹ thuật...";
+      const answer = state.question?.answerVisible ? (state.question.answer || "") : "";
+      $("viewerAnswer").textContent = answer ? `Đáp án: ${answer}` : "";
+      $("viewerAnswer").style.display = answer ? "" : "none";
+      const totalMs = Number(state.timer?.durationMs || Number(state.timer?.seconds || 0) * 1000);
+      const remainingMs = Number(state.timer?.remainingMs ?? Number(state.timer?.remaining || 0) * 1000);
+      const pct = totalMs > 0 ? Math.max(0, Math.min(100, remainingMs / totalMs * 100)) : 100;
+      $("viewerTimerBar").style.width = `${pct}%`;
+      $("viewerTimerBar").classList.toggle("warn", pct <= 50 && pct > 25);
+      $("viewerTimerBar").classList.toggle("danger", pct <= 25);
+      const candidates = [...(state.candidates || [])]
+        .slice(0, state.scoring?.candidateCount || 4)
+        .sort((a, b) => Number(b.score) - Number(a.score));
+      const max = Math.max(1, ...candidates.map((c) => Math.abs(Number(c.score || 0))));
+      $("viewerScores").innerHTML = candidates.map((c, index) => {
+        const height = Math.max(8, Math.abs(Number(c.score || 0)) / max * 100);
+        return `<div class="score-bar">
+          <div class="diamond-score"><span>HẠNG ${index + 1}<br>${c.score}</span></div>
+          <div class="score-fill" style="height:${height}%"></div>
+          <div class="diamond-name">${c.display_name}</div>
+        </div>`;
+      }).join("");
+    };
+  </script>
+</body>
+</html>

@@ -6,10 +6,11 @@ const express = require("express");
 const session = require("express-session");
 const multer = require("multer");
 const { Server } = require("socket.io");
-const { authenticate, requireAuth } = require("./auth");
+const { authenticate, requireAuth, hashPassword } = require("./auth");
 const { query, one } = require("./db");
 const { ensureRealtimeSchema } = require("./migrations");
 const { TABLES, getMeta, writableColumns, quote } = require("./tables");
+const { listAssetCatalog } = require("./assets-manager");
 const {
   exportDataset,
   importLct3Workbook,
@@ -18,14 +19,15 @@ const {
   workbookFromDataset,
   workbookFromTemplate,
 } = require("./excel");
-const { getDefaultRoom, getRoomByCode, loadRoomState, setupRealtime } = require("./realtime");
+const { SCREEN_ROLES, getRoomByCode, loadRoomState, setupRealtime } = require("./realtime");
+const { importQuestionPackage } = require("./zip-package");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 const upload = multer({
   dest: path.join(__dirname, "uploads"),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 250 * 1024 * 1024 },
 });
 const SEEDED_SERVER_KEYS = [
   "server-1",
@@ -37,6 +39,7 @@ const SEEDED_SERVER_KEYS = [
   "server-backup-a",
   "server-backup-b",
 ];
+const SERVER_MANAGED_TABLE_KEYS = new Set(["contestants"]);
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -84,9 +87,9 @@ function bodyValue(col, body, file) {
   return value;
 }
 
-async function dashboardCounts() {
+async function dashboardCounts(tables = TABLES) {
   const entries = await Promise.all(
-    Object.entries(TABLES).map(async ([key, meta]) => {
+    Object.entries(tables).map(async ([key, meta]) => {
       const row = await one(`SELECT COUNT(*) AS count FROM ${quote(meta.table)}`);
       return [key, row.count];
     }),
@@ -288,6 +291,227 @@ async function emitCandidatesForRoom(room) {
   io.to(room.room_code).emit("state:patch", { candidates: fresh.candidates });
 }
 
+function isAdminUser(user) {
+  return user?.role !== "bqt";
+}
+
+function visibleTables(user) {
+  if (!user) return {};
+  if (!isAdminUser(user)) return {};
+  return Object.fromEntries(Object.entries(TABLES).filter(([key]) => !SERVER_MANAGED_TABLE_KEYS.has(key)));
+}
+
+function tableManagedInsideServer(tableKey) {
+  return SERVER_MANAGED_TABLE_KEYS.has(tableKey);
+}
+
+function selectedServerSlotId(req) {
+  if (!req.session.user) return null;
+  if (!isAdminUser(req.session.user)) return normalizeServerSlotId(req.session.user.serverSlotId);
+  return normalizeServerSlotId(req.session.selectedServerSlotId);
+}
+
+function hasSelectedServer(req) {
+  return Boolean(selectedServerSlotId(req));
+}
+
+function requireAdminUser(req, res, next) {
+  if (!isAdminUser(req.session.user)) {
+    return res.status(403).send("Tài khoản BQT chỉ được điều khiển server đã được admin gán.");
+  }
+  next();
+}
+
+function redirectToServerSelect(req, res) {
+  const nextUrl = encodeURIComponent(req.originalUrl || "/technician");
+  return res.redirect(`/server/select?next=${nextUrl}`);
+}
+
+function requireServerSelected(req, res, next) {
+  if (!req.session.user) return res.redirect("/login");
+  if (hasSelectedServer(req)) return next();
+  return redirectToServerSelect(req, res);
+}
+
+async function currentServerSlot(req) {
+  const id = selectedServerSlotId(req);
+  if (!id) return null;
+  return one("SELECT * FROM server_slots WHERE id = ?", [id]);
+}
+
+function safeRedirectTarget(value, fallback = "/technician") {
+  const target = String(value || "").trim();
+  if (!target || !target.startsWith("/") || target.startsWith("//")) return fallback;
+  return target;
+}
+
+async function roomBelongsToSelectedServer(req, room) {
+  const serverSlotId = selectedServerSlotId(req);
+  if (!serverSlotId || !room) return false;
+  return Number(room.server_slot_id || 0) === Number(serverSlotId);
+}
+
+async function requireRoomAccess(req, res, room) {
+  if (!room) {
+    res.status(404).send("Không tìm thấy phòng.");
+    return false;
+  }
+  if (!hasSelectedServer(req)) {
+    redirectToServerSelect(req, res);
+    return false;
+  }
+  if (!(await roomBelongsToSelectedServer(req, room))) {
+    res.status(403).send("Phòng này thuộc server khác. Hãy chọn đúng server trước khi cấu hình.");
+    return false;
+  }
+  return true;
+}
+
+async function roomByIdForUser(req, roomId) {
+  const room = await one("SELECT * FROM match_rooms WHERE id = ?", [roomId]);
+  return (await roomBelongsToSelectedServer(req, room)) ? room : null;
+}
+
+async function ensureRoomForServer(serverSlot) {
+  let room = await one(
+    `SELECT *
+     FROM match_rooms
+     WHERE server_slot_id = ?
+     ORDER BY FIELD(status, 'live', 'paused', 'scheduled', 'draft', 'finished', 'cancelled'), id DESC
+     LIMIT 1`,
+    [serverSlot.id],
+  );
+  if (room) return room;
+
+  const roomCode = randomCode("ROOM");
+  const now = new Date();
+  const scheduledFrom = toMysqlDateTime(now);
+  const scheduledTo = toMysqlDateTime(addHours(now, 2));
+  await query(
+    `INSERT INTO match_rooms
+     (question_set_id, server_slot_id, server_name, purpose, room_code, quick_token, login_password, recovery_password, status, scheduled_from, scheduled_to)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)`,
+    [1, serverSlot.id, serverSlot.display_name, "Chưa cấu hình", roomCode, `${roomCode}-QUICK`, "admin", "admin", scheduledFrom, scheduledTo],
+  );
+  room = await one("SELECT * FROM match_rooms WHERE room_code = ?", [roomCode]);
+  await query("INSERT IGNORE INTO room_settings (room_id) VALUES (?)", [room.id]);
+  return room;
+}
+
+function serverScopedTableKey(tableKey) {
+  return new Set(["rooms", "contestants", "room-settings", "answers", "buzzers"]).has(tableKey);
+}
+
+function qualifyOrderBy(orderBy, alias) {
+  return String(orderBy || "id DESC")
+    .split(",")
+    .map((part) => {
+      const term = part.trim();
+      if (!term || term.includes(".") || term.includes("(")) return term;
+      const match = term.match(/^`?([A-Za-z0-9_]+)`?(.*)$/);
+      return match ? `${alias}.${quote(match[1])}${match[2] || ""}` : term;
+    })
+    .join(", ");
+}
+
+function scopedTableListSql(tableKey, meta, serverSlotId) {
+  if (!serverScopedTableKey(tableKey)) {
+    return {
+      sql: `SELECT * FROM ${quote(meta.table)} ORDER BY ${meta.orderBy}`,
+      values: [],
+    };
+  }
+  const orderBy = qualifyOrderBy(meta.orderBy, "t");
+  if (tableKey === "rooms") {
+    return {
+      sql: `SELECT t.* FROM ${quote(meta.table)} t WHERE t.server_slot_id = ? ORDER BY ${orderBy}`,
+      values: [serverSlotId],
+    };
+  }
+  if (tableKey === "contestants") {
+    return {
+      sql: `SELECT t.*
+            FROM ${quote(meta.table)} t
+            JOIN match_rooms r ON r.id = t.room_id
+            WHERE r.server_slot_id = ?
+            ORDER BY ${orderBy}`,
+      values: [serverSlotId],
+    };
+  }
+  return {
+    sql: `SELECT t.*
+          FROM ${quote(meta.table)} t
+          JOIN match_rooms r ON r.id = t.room_id
+          WHERE r.server_slot_id = ?
+          ORDER BY ${orderBy}`,
+    values: [serverSlotId],
+  };
+}
+
+async function recordBelongsToSelectedServer(req, tableKey, row) {
+  if (!serverScopedTableKey(tableKey)) return true;
+  const serverSlotId = selectedServerSlotId(req);
+  if (!serverSlotId) return false;
+  if (tableKey === "rooms") return Number(row.server_slot_id || 0) === Number(serverSlotId);
+  const roomId = Number(row.room_id || 0);
+  if (!roomId) return false;
+  const room = await one("SELECT id FROM match_rooms WHERE id = ? AND server_slot_id = ?", [roomId, serverSlotId]);
+  return Boolean(room);
+}
+
+async function normalizeScopedAdminTableBody(req, tableKey) {
+  if (!serverScopedTableKey(tableKey)) return;
+  const serverSlot = await currentServerSlot(req);
+  if (!serverSlot) {
+    const error = new Error("Admin phải chọn server trước khi thêm/sửa/xóa dữ liệu theo phòng.");
+    error.status = 428;
+    throw error;
+  }
+  if (tableKey === "rooms") {
+    req.body.server_slot_id = serverSlot.id;
+    req.body.server_name = serverSlot.display_name;
+    return;
+  }
+  if (req.body.room_id) {
+    const room = await one("SELECT id FROM match_rooms WHERE id = ? AND server_slot_id = ?", [req.body.room_id, serverSlot.id]);
+    if (!room) {
+      const error = new Error("Phòng không thuộc server đang chọn.");
+      error.status = 403;
+      throw error;
+    }
+  }
+}
+
+async function loadBqtUsers() {
+  return query(
+    `SELECT a.id, a.username, a.display_name, a.role, a.server_slot_id, a.is_active, a.created_at, s.display_name AS server_name
+     FROM admins a
+     LEFT JOIN server_slots s ON s.id = a.server_slot_id
+     WHERE a.role = 'bqt'
+     ORDER BY s.sort_order ASC, a.username ASC`,
+  );
+}
+
+function normalizeBqtUserBody(body) {
+  return {
+    username: textOrDefault(body.username, ""),
+    displayName: textOrDefault(body.display_name, body.username || "BQT"),
+    password: String(body.password || "").trim(),
+    serverSlotId: normalizeServerSlotId(body.server_slot_id),
+    isActive: body.is_active === "0" || body.is_active === 0 ? 0 : 1,
+  };
+}
+
+app.use(async (req, res, next) => {
+  try {
+    res.locals.visibleTables = visibleTables(req.session.user);
+    res.locals.selectedServerSlot = await currentServerSlot(req);
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.get("/", (req, res) => {
   if (!req.session.user) return res.redirect("/login");
   res.redirect("/dashboard");
@@ -302,7 +526,12 @@ app.post("/login", async (req, res, next) => {
     const user = await authenticate(req.body.username || "", req.body.password || "");
     if (!user) return res.status(401).render("login", { error: "Sai tài khoản hoặc mật khẩu." });
     req.session.user = user;
-    res.redirect("/dashboard");
+    if (!isAdminUser(user)) {
+      req.session.selectedServerSlotId = user.serverSlotId || null;
+      return res.redirect("/technician");
+    }
+    req.session.selectedServerSlotId = null;
+    res.redirect("/server/select?next=/technician");
   } catch (err) {
     next(err);
   }
@@ -312,17 +541,80 @@ app.post("/logout", requireAuth, (req, res) => {
   req.session.destroy(() => res.redirect("/login"));
 });
 
+app.get("/server/select", requireAuth, async (req, res, next) => {
+  try {
+    const nextUrl = safeRedirectTarget(req.query.next, "/technician");
+    if (!isAdminUser(req.session.user)) {
+      if (!req.session.user.serverSlotId) {
+        return res.status(403).render("select-server", {
+          user: req.session.user,
+          tables: visibleTables(req.session.user),
+          current: "server-select",
+          servers: [],
+          nextUrl,
+          error: "Tài khoản BQT này chưa được admin gán server.",
+        });
+      }
+      req.session.selectedServerSlotId = req.session.user.serverSlotId;
+      return res.redirect(nextUrl);
+    }
+    const servers = await listControlServerSlots();
+    res.render("select-server", {
+      user: req.session.user,
+      tables: visibleTables(req.session.user),
+      current: "server-select",
+      servers,
+      nextUrl,
+      error: null,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post("/server/select", requireAuth, requireAdminUser, async (req, res, next) => {
+  try {
+    const serverSlot = await resolveServerSlot(req.body.server_slot_id);
+    if (!serverSlot) return res.status(400).send("Vui lòng chọn server hợp lệ.");
+    req.session.selectedServerSlotId = serverSlot.id;
+    res.redirect(safeRedirectTarget(req.body.next, "/technician"));
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.get("/dashboard", requireAuth, async (req, res, next) => {
   try {
-    const counts = await dashboardCounts();
-    const rooms = await query("SELECT * FROM match_rooms ORDER BY id DESC LIMIT 6");
-    const events = await query("SELECT * FROM contestant_events ORDER BY id DESC LIMIT 10");
+    const currentServerId = selectedServerSlotId(req);
+    const tables = visibleTables(req.session.user);
+    const counts = await dashboardCounts(tables);
+    const rooms = await query(
+      `SELECT *
+       FROM match_rooms
+       ${currentServerId ? "WHERE server_slot_id = ?" : ""}
+       ORDER BY id DESC
+       LIMIT 6`,
+      currentServerId ? [currentServerId] : [],
+    );
+    const events = await query(
+      `SELECT e.*
+       FROM contestant_events e
+       JOIN match_rooms r ON r.id = e.room_id
+       ${currentServerId ? "WHERE r.server_slot_id = ?" : ""}
+       ORDER BY e.id DESC
+       LIMIT 10`,
+      currentServerId ? [currentServerId] : [],
+    );
+    const importJobs = await query("SELECT * FROM import_jobs ORDER BY id DESC LIMIT 8").catch(() => []);
+    const assetCatalog = listAssetCatalog();
     res.render("dashboard", {
       user: req.session.user,
-      tables: TABLES,
+      tables,
       counts,
       rooms,
       events,
+      importJobs,
+      assetCatalog,
       current: "dashboard",
     });
   } catch (err) {
@@ -330,31 +622,34 @@ app.get("/dashboard", requireAuth, async (req, res, next) => {
   }
 });
 
-app.get("/technician", requireAuth, async (req, res, next) => {
+app.get("/technician", requireAuth, requireServerSelected, async (req, res, next) => {
   try {
-    const room = await getDefaultRoom();
+    const serverSlot = await currentServerSlot(req);
+    if (!serverSlot) return redirectToServerSelect(req, res);
+    const room = await ensureRoomForServer(serverSlot);
     res.redirect(`/technician/${room.room_code}`);
   } catch (err) {
     next(err);
   }
 });
 
-app.get("/technician/:roomCode", requireAuth, async (req, res, next) => {
+app.get("/technician/:roomCode", requireAuth, requireServerSelected, async (req, res, next) => {
   try {
     const room = await getRoomByCode(req.params.roomCode);
     if (!room) return res.status(404).send("Không tìm thấy phòng.");
+    if (!(await requireRoomAccess(req, res, room))) return;
     const state = await loadRoomState(room.id);
     const questionSetId = questionSetIdFromRoom(room);
-    const servers = await listControlServerSlots();
-    const serverSlot = await resolveServerSlot(room.server_slot_id, room.server_name);
+    const serverSlot = await currentServerSlot(req);
+    const servers = serverSlot ? [serverSlot] : [];
     const rooms = await query(
       `SELECT r.*, qs.set_code AS question_set_code, qs.name AS question_set_name
        FROM match_rooms r
        LEFT JOIN question_sets qs ON qs.id = r.question_set_id
-       WHERE (r.server_slot_id <=> ? OR r.server_name = ?)
+       WHERE r.server_slot_id = ?
        ORDER BY r.id DESC
        LIMIT 20`,
-      [serverSlot?.id || null, room.server_name],
+      [serverSlot.id],
     );
     const questionSets = await query("SELECT id, set_code, name, visibility, is_active FROM question_sets WHERE is_active = 1 ORDER BY id ASC");
     const contestants = await query("SELECT * FROM contestants WHERE room_id = ? ORDER BY seat_no ASC, id ASC", [room.id]);
@@ -363,12 +658,13 @@ app.get("/technician/:roomCode", requireAuth, async (req, res, next) => {
     const walls = await query("SELECT * FROM connecting_wall_sets WHERE question_set_id = ? ORDER BY id DESC LIMIT 20", [questionSetId]);
     res.render("technician", {
       user: req.session.user,
-      tables: TABLES,
+      tables: visibleTables(req.session.user),
       current: "technician",
       room,
       rooms,
       servers,
       serverSlot,
+      canSwitchServer: isAdminUser(req.session.user),
       questionSets,
       state,
       contestants,
@@ -383,7 +679,12 @@ app.get("/technician/:roomCode", requireAuth, async (req, res, next) => {
   }
 });
 
+app.get(["/candidate", "/client", "/client/:mode", "/student", "/student/:roomCode?/:mode?"], (req, res) => {
+  res.status(410).send("Client web da tat. Hay dung app Olympia Client desktop va nhap ma ID thi sinh.");
+});
+
 app.get("/candidate/:roomCode/:mode?", async (req, res, next) => {
+  return res.status(410).send("Client web da tat. Hay dung app Olympia Client desktop va nhap ma ID thi sinh.");
   try {
     const room = await getRoomByCode(req.params.roomCode);
     if (!room) return res.status(404).send("Không tìm thấy phòng.");
@@ -405,7 +706,7 @@ app.get("/quick/:token/:mode?", async (req, res, next) => {
   try {
     const room = await one("SELECT room_code FROM match_rooms WHERE quick_token = ? OR room_code = ?", [req.params.token, req.params.token]);
     if (!room) return res.status(404).send("Mã chọn server/phòng không hợp lệ.");
-    res.redirect(`/candidate/${room.room_code}/${req.params.mode === "olympia" ? "olympia" : "default"}?quick=1`);
+    res.status(410).send("Client web da tat. Hay dung app Olympia Client desktop va nhap ma ID thi sinh.");
   } catch (err) {
     next(err);
   }
@@ -415,7 +716,7 @@ app.get("/projector/:roomCode", async (req, res, next) => {
   try {
     const room = await getRoomByCode(req.params.roomCode);
     if (!room) return res.status(404).send("Không tìm thấy phòng.");
-    res.render("projector", { room, overlay: false });
+    res.render("projector", { room, overlay: false, screenRole: SCREEN_ROLES.SCOREBOARD });
   } catch (err) {
     next(err);
   }
@@ -425,17 +726,17 @@ app.get("/overlay/:roomCode", async (req, res, next) => {
   try {
     const room = await getRoomByCode(req.params.roomCode);
     if (!room) return res.status(404).send("Không tìm thấy phòng.");
-    res.render("projector", { room, overlay: true });
+    res.render("projector", { room, overlay: true, screenRole: SCREEN_ROLES.SCOREBOARD });
   } catch (err) {
     next(err);
   }
 });
 
-app.get("/host/:roomCode", async (req, res, next) => {
+app.get(["/host/:roomCode", "/mc/:roomCode"], async (req, res, next) => {
   try {
     const room = await getRoomByCode(req.params.roomCode);
     if (!room) return res.status(404).send("Không tìm thấy phòng.");
-    res.render("host", { room });
+    res.render("host", { room, screenRole: SCREEN_ROLES.MC });
   } catch (err) {
     next(err);
   }
@@ -445,15 +746,25 @@ app.get("/scoreboard/:roomCode", async (req, res, next) => {
   try {
     const room = await getRoomByCode(req.params.roomCode);
     if (!room) return res.status(404).send("Không tìm thấy phòng.");
-    res.render("scoreboard", { room });
+    res.render("scoreboard", { room, screenRole: SCREEN_ROLES.SCOREBOARD });
   } catch (err) {
     next(err);
   }
 });
 
-app.post("/rooms/book", requireAuth, async (req, res, next) => {
+app.get("/viewer/:roomCode", async (req, res, next) => {
   try {
-    const serverSlot = await resolveServerSlot(req.body.server_slot_id, req.body.server_name);
+    const room = await getRoomByCode(req.params.roomCode);
+    if (!room) return res.status(404).send("Không tìm thấy phòng.");
+    res.render("viewer", { room, screenRole: SCREEN_ROLES.VIEWER });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post("/rooms/book", requireAuth, requireServerSelected, async (req, res, next) => {
+  try {
+    const serverSlot = await currentServerSlot(req);
     if (!serverSlot) return res.status(400).send("Vui lòng chọn server trước khi tạo phòng.");
     if (serverSlot.status === "maintenance") return res.status(409).send("Server đang bảo trì, không thể tạo phòng.");
     if (await serverSlotHasActiveRoom(serverSlot.id)) {
@@ -488,11 +799,12 @@ app.post("/rooms/book", requireAuth, async (req, res, next) => {
   }
 });
 
-app.post("/rooms/:id/question-set", requireAuth, async (req, res, next) => {
+app.post("/rooms/:id/question-set", requireAuth, requireServerSelected, async (req, res, next) => {
   try {
     const questionSetId = Number(req.body.question_set_id || 1);
     const room = await one("SELECT * FROM match_rooms WHERE id = ?", [req.params.id]);
     if (!room) return res.status(404).send("Không tìm thấy phòng.");
+    if (!(await requireRoomAccess(req, res, room))) return;
     const questionSet = await one("SELECT id FROM question_sets WHERE id = ? AND is_active = 1", [questionSetId]);
     if (!questionSet) return res.status(400).send("Bộ đề không hợp lệ hoặc đang bị tắt.");
     await query("UPDATE match_rooms SET question_set_id = ? WHERE id = ?", [questionSetId, req.params.id]);
@@ -502,11 +814,12 @@ app.post("/rooms/:id/question-set", requireAuth, async (req, res, next) => {
   }
 });
 
-app.post("/rooms/:id/status", requireAuth, async (req, res, next) => {
+app.post("/rooms/:id/status", requireAuth, requireServerSelected, async (req, res, next) => {
   try {
     const status = ["draft", "scheduled", "live", "paused", "finished", "cancelled"].includes(req.body.status) ? req.body.status : "scheduled";
     const room = await one("SELECT * FROM match_rooms WHERE id = ?", [req.params.id]);
     if (!room) return res.status(404).send("Không tìm thấy phòng.");
+    if (!(await requireRoomAccess(req, res, room))) return;
     await query("UPDATE match_rooms SET status = ? WHERE id = ?", [status, req.params.id]);
     await syncServerSlotStatus(room.server_slot_id);
     io.to(room.room_code).emit("state:patch", { notice: `Trạng thái phòng: ${status}` });
@@ -516,10 +829,11 @@ app.post("/rooms/:id/status", requireAuth, async (req, res, next) => {
   }
 });
 
-app.post("/rooms/:id/contestants", requireAuth, async (req, res, next) => {
+app.post("/rooms/:id/contestants", requireAuth, requireServerSelected, async (req, res, next) => {
   try {
     const room = await one("SELECT * FROM match_rooms WHERE id = ?", [req.params.id]);
     if (!room) return res.status(404).send("Không tìm thấy phòng.");
+    if (!(await requireRoomAccess(req, res, room))) return;
     const seatNo = req.body.seat_no ? Number(req.body.seat_no) : await nextContestantSeatNo(room.id);
     const loginCode = String(req.body.login_code || "").trim() || (await generateContestantLoginCode(room.id, seatNo));
     normalizeContestantBody(req.body, { room_id: room.id, seat_no: seatNo, login_code: loginCode });
@@ -544,16 +858,17 @@ app.post("/rooms/:id/contestants", requireAuth, async (req, res, next) => {
   }
 });
 
-app.post("/contestants/:id/update", requireAuth, async (req, res, next) => {
+app.post("/contestants/:id/update", requireAuth, requireServerSelected, async (req, res, next) => {
   try {
     const contestant = await one(
-      `SELECT c.*, r.room_code
+      `SELECT c.*, r.room_code, r.server_slot_id
        FROM contestants c
        JOIN match_rooms r ON r.id = c.room_id
        WHERE c.id = ?`,
       [req.params.id],
     );
     if (!contestant) return res.status(404).send("Không tìm thấy thí sinh.");
+    if (!(await requireRoomAccess(req, res, contestant))) return;
     normalizeContestantBody(req.body, contestant);
     await query(
       `UPDATE contestants
@@ -583,16 +898,17 @@ app.post("/contestants/:id/update", requireAuth, async (req, res, next) => {
   }
 });
 
-app.post("/contestants/:id/delete", requireAuth, async (req, res, next) => {
+app.post("/contestants/:id/delete", requireAuth, requireServerSelected, async (req, res, next) => {
   try {
     const contestant = await one(
-      `SELECT c.room_id, r.room_code
+      `SELECT c.room_id, r.room_code, r.server_slot_id
        FROM contestants c
        JOIN match_rooms r ON r.id = c.room_id
        WHERE c.id = ?`,
       [req.params.id],
     );
     if (!contestant) return res.status(404).send("Không tìm thấy thí sinh.");
+    if (!(await requireRoomAccess(req, res, contestant))) return;
     await query("DELETE FROM contestants WHERE id = ?", [req.params.id]);
     await emitCandidatesForRoom({ id: contestant.room_id, room_code: contestant.room_code });
     res.redirect(`/technician/${contestant.room_code}`);
@@ -601,10 +917,11 @@ app.post("/contestants/:id/delete", requireAuth, async (req, res, next) => {
   }
 });
 
-app.post("/rooms/:id/unbook", requireAuth, async (req, res, next) => {
+app.post("/rooms/:id/unbook", requireAuth, requireServerSelected, async (req, res, next) => {
   try {
     const room = await one("SELECT * FROM match_rooms WHERE id = ?", [req.params.id]);
     if (!room) return res.status(404).send("Không tìm thấy phòng.");
+    if (!(await requireRoomAccess(req, res, room))) return;
     const scheduled = room.scheduled_from ? new Date(room.scheduled_from).getTime() : Date.now();
     if (Date.now() > scheduled - 3 * 60 * 1000 && room.status !== "draft") {
       return res.status(400).send("Chỉ được hủy trước giờ bắt đầu tối thiểu 3 phút.");
@@ -617,10 +934,11 @@ app.post("/rooms/:id/unbook", requireAuth, async (req, res, next) => {
   }
 });
 
-app.post("/rooms/:id/recover", async (req, res, next) => {
+app.post("/rooms/:id/recover", requireAuth, requireServerSelected, async (req, res, next) => {
   try {
     const room = await one("SELECT * FROM match_rooms WHERE id = ? AND recovery_password = ?", [req.params.id, req.body.recovery_password || ""]);
     if (!room) return res.status(403).send("Mật khẩu cấp 2 không đúng.");
+    if (!(await requireRoomAccess(req, res, room))) return;
     await query("UPDATE match_rooms SET login_password = ? WHERE id = ?", [req.body.login_password || randomCode("PASS"), req.params.id]);
     res.redirect(`/technician/${room.room_code}`);
   } catch (err) {
@@ -643,6 +961,32 @@ app.post("/media/upload", requireAuth, upload.single("file"), async (req, res, n
       ],
     );
     res.json({ url, absoluteUrl: `${publicBase(req)}${url}` });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get("/api/assets", requireAuth, (req, res) => {
+  res.json({ roots: listAssetCatalog() });
+});
+
+app.get("/api/rooms/:id/recovery-state", requireAuth, requireServerSelected, async (req, res, next) => {
+  try {
+    const room = await one("SELECT * FROM match_rooms WHERE id = ?", [req.params.id]);
+    if (!room) return res.status(404).json({ error: "Không tìm thấy phòng." });
+    if (!(await requireRoomAccess(req, res, room))) return;
+    const state = await loadRoomState(room.id);
+    res.json({
+      room: { id: room.id, room_code: room.room_code, status: room.status },
+      state,
+      recovery: {
+        round: state.round,
+        questionKey: state.question?.key || null,
+        activeContestantId: state.warmup?.activeContestantId || state.finish?.activeContestantId || null,
+        timer: state.timer,
+        candidates: state.candidates,
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -689,7 +1033,77 @@ app.get("/templates/:format.xlsx", requireAuth, async (req, res, next) => {
   }
 });
 
-app.get("/admin/export.json", requireAuth, async (req, res, next) => {
+app.get("/admin/bqt-users", requireAuth, requireAdminUser, async (req, res, next) => {
+  try {
+    const servers = await listControlServerSlots();
+    const users = await loadBqtUsers();
+    res.render("bqt-users", {
+      user: req.session.user,
+      tables: visibleTables(req.session.user),
+      current: "bqt-users",
+      servers,
+      users,
+      error: null,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post("/admin/bqt-users", requireAuth, requireAdminUser, async (req, res, next) => {
+  try {
+    const data = normalizeBqtUserBody(req.body);
+    if (!data.username || !data.password || !data.serverSlotId) {
+      return res.status(400).send("Thiếu username, password hoặc server.");
+    }
+    await query(
+      `INSERT INTO admins (username, password_hash, display_name, role, server_slot_id, is_active)
+       VALUES (?, ?, ?, 'bqt', ?, ?)`,
+      [data.username, hashPassword(data.password), data.displayName, data.serverSlotId, data.isActive],
+    );
+    res.redirect("/admin/bqt-users");
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post("/admin/bqt-users/:id/update", requireAuth, requireAdminUser, async (req, res, next) => {
+  try {
+    const data = normalizeBqtUserBody(req.body);
+    const target = await one("SELECT id FROM admins WHERE id = ? AND role = 'bqt'", [req.params.id]);
+    if (!target) return res.status(404).send("Không tìm thấy tài khoản BQT.");
+    if (!data.username || !data.serverSlotId) return res.status(400).send("Thiếu username hoặc server.");
+    if (data.password) {
+      await query(
+        `UPDATE admins
+         SET username = ?, password_hash = ?, display_name = ?, server_slot_id = ?, is_active = ?
+         WHERE id = ? AND role = 'bqt'`,
+        [data.username, hashPassword(data.password), data.displayName, data.serverSlotId, data.isActive, req.params.id],
+      );
+    } else {
+      await query(
+        `UPDATE admins
+         SET username = ?, display_name = ?, server_slot_id = ?, is_active = ?
+         WHERE id = ? AND role = 'bqt'`,
+        [data.username, data.displayName, data.serverSlotId, data.isActive, req.params.id],
+      );
+    }
+    res.redirect("/admin/bqt-users");
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post("/admin/bqt-users/:id/delete", requireAuth, requireAdminUser, async (req, res, next) => {
+  try {
+    await query("DELETE FROM admins WHERE id = ? AND role = 'bqt'", [req.params.id]);
+    res.redirect("/admin/bqt-users");
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get("/admin/export.json", requireAuth, requireAdminUser, async (req, res, next) => {
   try {
     const dataset = await exportDataset();
     res.setHeader("Content-Disposition", "attachment; filename=\"game_olympia_export.json\"");
@@ -699,7 +1113,7 @@ app.get("/admin/export.json", requireAuth, async (req, res, next) => {
   }
 });
 
-app.get("/admin/export.xlsx", requireAuth, async (req, res, next) => {
+app.get("/admin/export.xlsx", requireAuth, requireAdminUser, async (req, res, next) => {
   try {
     const dataset = await exportDataset();
     const workbook = await workbookFromDataset(dataset);
@@ -712,15 +1126,23 @@ app.get("/admin/export.xlsx", requireAuth, async (req, res, next) => {
   }
 });
 
-app.post("/admin/import", requireAuth, upload.single("file"), async (req, res, next) => {
+app.post("/admin/import", requireAuth, requireAdminUser, upload.single("file"), async (req, res, next) => {
   try {
-    if (!req.file) return res.status(400).send("Thiếu file Excel.");
+    if (!req.file) return res.status(400).send("Thiếu file Excel/ZIP.");
     const format = req.body.format === "lct3" ? "lct3" : "q2t_standard";
     const questionSetId = Number(req.body.question_set_id || 1);
-    const imported = format === "lct3" ? await importLct3Workbook(req.file.path, questionSetId) : await importStandardWorkbook(req.file.path, questionSetId);
+    const isZip = path.extname(req.file.originalname || "").toLowerCase() === ".zip";
+    const result = isZip
+      ? await importQuestionPackage(req.file.path, {
+        originalName: req.file.originalname,
+        format,
+        questionSetId,
+        uploadsDir: path.join(__dirname, "uploads"),
+      })
+      : { imported: format === "lct3" ? await importLct3Workbook(req.file.path, questionSetId) : await importStandardWorkbook(req.file.path, questionSetId), assets: [] };
     await query(
       "INSERT INTO import_jobs (file_name, format_key, status, message) VALUES (?, ?, 'imported', ?)",
-      [req.file.originalname, format, `Imported ${imported} rows into question_set_id=${questionSetId}`],
+      [req.file.originalname, format, `${isZip ? "ZIP package: " : ""}Imported ${result.imported} rows and ${result.assets.length} assets into question_set_id=${questionSetId}`],
     );
     res.redirect("/admin/question-sets");
   } catch (err) {
@@ -734,23 +1156,34 @@ app.post("/admin/import", requireAuth, upload.single("file"), async (req, res, n
   }
 });
 
-app.get("/admin/:table", requireAuth, async (req, res, next) => {
+app.get("/admin/:table", requireAuth, requireAdminUser, async (req, res, next) => {
   try {
     const meta = getMeta(req.params.table);
     if (!meta) return res.status(404).send("Unknown table");
-    const rows = await query(`SELECT * FROM ${quote(meta.table)} ORDER BY ${meta.orderBy}`);
-    res.render("table", { user: req.session.user, tables: TABLES, current: req.params.table, key: req.params.table, meta, rows });
+    if (tableManagedInsideServer(req.params.table)) {
+      if (!hasSelectedServer(req)) return redirectToServerSelect(req, res);
+      return res.redirect("/technician#server-contestants");
+    }
+    if (serverScopedTableKey(req.params.table) && !hasSelectedServer(req)) return redirectToServerSelect(req, res);
+    const scoped = scopedTableListSql(req.params.table, meta, selectedServerSlotId(req));
+    const rows = await query(scoped.sql, scoped.values);
+    res.render("table", { user: req.session.user, tables: visibleTables(req.session.user), current: req.params.table, key: req.params.table, meta, rows });
   } catch (err) {
     next(err);
   }
 });
 
-app.get("/admin/:table/new", requireAuth, (req, res) => {
+app.get("/admin/:table/new", requireAuth, requireAdminUser, (req, res) => {
   const meta = getMeta(req.params.table);
   if (!meta) return res.status(404).send("Unknown table");
+  if (tableManagedInsideServer(req.params.table)) {
+    if (!hasSelectedServer(req)) return redirectToServerSelect(req, res);
+    return res.redirect("/technician#server-contestants");
+  }
+  if (serverScopedTableKey(req.params.table) && !hasSelectedServer(req)) return redirectToServerSelect(req, res);
   res.render("form", {
     user: req.session.user,
-    tables: TABLES,
+    tables: visibleTables(req.session.user),
     current: req.params.table,
     key: req.params.table,
     meta,
@@ -759,16 +1192,22 @@ app.get("/admin/:table/new", requireAuth, (req, res) => {
   });
 });
 
-app.get("/admin/:table/edit", requireAuth, async (req, res, next) => {
+app.get("/admin/:table/edit", requireAuth, requireAdminUser, async (req, res, next) => {
   try {
     const meta = getMeta(req.params.table);
     if (!meta) return res.status(404).send("Unknown table");
+    if (tableManagedInsideServer(req.params.table)) {
+      if (!hasSelectedServer(req)) return redirectToServerSelect(req, res);
+      return res.redirect("/technician#server-contestants");
+    }
+    if (serverScopedTableKey(req.params.table) && !hasSelectedServer(req)) return redirectToServerSelect(req, res);
     const where = buildWhere(meta, req.query);
     const row = await one(`SELECT * FROM ${quote(meta.table)} WHERE ${where.clause}`, where.values);
     if (!row) return res.status(404).send("Không tìm thấy bản ghi.");
+    if (!(await recordBelongsToSelectedServer(req, req.params.table, row))) return res.status(403).send("Bản ghi thuộc server khác.");
     res.render("form", {
       user: req.session.user,
-      tables: TABLES,
+      tables: visibleTables(req.session.user),
       current: req.params.table,
       key: req.params.table,
       meta,
@@ -780,10 +1219,16 @@ app.get("/admin/:table/edit", requireAuth, async (req, res, next) => {
   }
 });
 
-app.post("/admin/:table", requireAuth, upload.single("file"), async (req, res, next) => {
+app.post("/admin/:table", requireAuth, requireAdminUser, upload.single("file"), async (req, res, next) => {
   try {
     const meta = getMeta(req.params.table);
     if (!meta) return res.status(404).send("Unknown table");
+    if (tableManagedInsideServer(req.params.table)) {
+      if (!hasSelectedServer(req)) return redirectToServerSelect(req, res);
+      return res.redirect("/technician#server-contestants");
+    }
+    if (serverScopedTableKey(req.params.table) && !hasSelectedServer(req)) return redirectToServerSelect(req, res);
+    await normalizeScopedAdminTableBody(req, req.params.table);
     normalizeAdminTableBody(req.params.table, req.body);
     const cols = writableColumns(meta, "insert");
     const names = cols.map((col) => col.name);
@@ -803,15 +1248,24 @@ app.post("/admin/:table", requireAuth, upload.single("file"), async (req, res, n
   }
 });
 
-app.post("/admin/:table/update", requireAuth, upload.single("file"), async (req, res, next) => {
+app.post("/admin/:table/update", requireAuth, requireAdminUser, upload.single("file"), async (req, res, next) => {
   try {
     const meta = getMeta(req.params.table);
     if (!meta) return res.status(404).send("Unknown table");
+    if (tableManagedInsideServer(req.params.table)) {
+      if (!hasSelectedServer(req)) return redirectToServerSelect(req, res);
+      return res.redirect("/technician#server-contestants");
+    }
+    if (serverScopedTableKey(req.params.table) && !hasSelectedServer(req)) return redirectToServerSelect(req, res);
+    const where = buildWhere(meta, req.body);
+    const existingRow = await one(`SELECT * FROM ${quote(meta.table)} WHERE ${where.clause}`, where.values);
+    if (!existingRow) return res.status(404).send("Không tìm thấy bản ghi.");
+    if (!(await recordBelongsToSelectedServer(req, req.params.table, existingRow))) return res.status(403).send("Bản ghi thuộc server khác.");
+    await normalizeScopedAdminTableBody(req, req.params.table);
     normalizeAdminTableBody(req.params.table, req.body);
     const cols = writableColumns(meta, "update").filter((col) => !meta.primaryKey.includes(col.name));
     const assignments = cols.map((col) => `${quote(col.name)} = ?`);
     const values = cols.map((col) => bodyValue(col, req.body, req.file));
-    const where = buildWhere(meta, req.body);
     const previousRoom = req.params.table === "rooms"
       ? await one(`SELECT server_slot_id FROM ${quote(meta.table)} WHERE ${where.clause}`, where.values)
       : null;
@@ -830,14 +1284,20 @@ app.post("/admin/:table/update", requireAuth, upload.single("file"), async (req,
   }
 });
 
-app.post("/admin/:table/delete", requireAuth, async (req, res, next) => {
+app.post("/admin/:table/delete", requireAuth, requireAdminUser, async (req, res, next) => {
   try {
     const meta = getMeta(req.params.table);
     if (!meta) return res.status(404).send("Unknown table");
+    if (tableManagedInsideServer(req.params.table)) {
+      if (!hasSelectedServer(req)) return redirectToServerSelect(req, res);
+      return res.redirect("/technician#server-contestants");
+    }
+    if (serverScopedTableKey(req.params.table) && !hasSelectedServer(req)) return redirectToServerSelect(req, res);
     const where = buildWhere(meta, req.body);
-    const deletingRoom = req.params.table === "rooms"
-      ? await one(`SELECT server_slot_id FROM ${quote(meta.table)} WHERE ${where.clause}`, where.values)
-      : null;
+    const deletingRow = await one(`SELECT * FROM ${quote(meta.table)} WHERE ${where.clause}`, where.values);
+    if (!deletingRow) return res.status(404).send("Không tìm thấy bản ghi.");
+    if (!(await recordBelongsToSelectedServer(req, req.params.table, deletingRow))) return res.status(403).send("Bản ghi thuộc server khác.");
+    const deletingRoom = req.params.table === "rooms" ? deletingRow : null;
     await query(`DELETE FROM ${quote(meta.table)} WHERE ${where.clause}`, where.values);
     if (req.params.table === "rooms") await syncServerSlotStatus(deletingRoom?.server_slot_id);
     res.redirect(`/admin/${req.params.table}`);
@@ -848,9 +1308,9 @@ app.post("/admin/:table/delete", requireAuth, async (req, res, next) => {
 
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).render("error", {
+  res.status(err.status || 500).render("error", {
     user: req.session.user,
-    tables: TABLES,
+    tables: visibleTables(req.session.user),
     current: "",
     error: err,
   });

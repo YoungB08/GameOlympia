@@ -3,37 +3,52 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Host - <%= room.room_code %></title>
+  <title>MC - <%= room.room_code %></title>
   <link rel="stylesheet" href="/public/broadcast.css">
 </head>
-<body class="broadcast">
+<body class="broadcast" data-screen-role="<%= screenRole %>">
   <main class="tech-main">
     <section class="glass">
       <div class="top-line">
         <h1 id="hostRound">SETUP</h1>
-        <div class="score-frame">Còn <span id="hostTimer">0</span>s</div>
+        <div class="score-frame"><%= screenRole %> · Còn <span id="hostTimer">0</span>s</div>
       </div>
       <h2>Câu hỏi</h2>
       <div class="question-box" id="hostQuestion">Đang chờ kỹ thuật...</div>
       <h2>Đáp án</h2>
-      <div class="question-box" style="color:#f59e0b" id="hostAnswer">---</div>
+      <div class="question-box mc-answer" id="hostAnswer">---</div>
+      <h2>Ghi chÃº Ä‘á»c / giáº£i thÃ­ch</h2>
+      <div class="question-box mc-note" id="hostNote">---</div>
       <h2 class="mc-notice" id="hostNotice"></h2>
+    </section>
+    <section class="glass" style="margin-top:14px">
+      <h2>Thá»© tá»± báº¥m chuÃ´ng</h2>
+      <div id="hostBuzzers" class="mc-buzzer-list"></div>
     </section>
     <section class="glass" style="margin-top:14px">
       <h2>Trạng thái thí sinh</h2>
       <div id="hostCandidates" class="section-grid"></div>
     </section>
   </main>
-  <script>window.ROOM_CODE = "<%= room.room_code %>";</script>
+  <script>
+    window.ROOM_CODE = "<%= room.room_code %>";
+    window.SCREEN_ROLE = "<%= screenRole %>";
+  </script>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/public/realtime-client.js"></script>
+  <script src="/public/realtime-client.js?v=20260723-roles-ms"></script>
   <script>
     const $ = (id) => document.getElementById(id);
+    function hostTimerText(state) {
+      const remainingMs = Number(state.timer?.remainingMs ?? Number(state.timer?.remaining || 0) * 1000);
+      if (state.round === "speed" && Number.isFinite(remainingMs)) return (remainingMs / 1000).toFixed(2);
+      return String(Math.ceil(Math.max(0, remainingMs) / 1000));
+    }
     window.renderRealtimeState = function (state) {
       $("hostRound").textContent = String(state.round || "setup").toUpperCase();
-      $("hostTimer").textContent = state.timer?.remaining ?? 0;
+      $("hostTimer").textContent = hostTimerText(state);
       $("hostQuestion").textContent = state.question?.text || "Đang chờ kỹ thuật...";
       $("hostAnswer").textContent = state.question?.answer || "---";
+      $("hostNote").textContent = state.question?.note || "---";
       $("hostNotice").textContent = state.notice || "";
       $("hostCandidates").innerHTML = (state.candidates || []).map((c) => {
         const status = state.ring?.lastStatus?.[c.id] === "foul" ? '<br><span class="foul-text">PHẠM QUY</span>' : "";

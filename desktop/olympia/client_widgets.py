@@ -50,7 +50,7 @@ QLabel#smallCaption {{
     font-size: 13px;
     font-weight: 600;
 }}
-QLabel#roundBadge {{
+QLabel#roundBadge, QPushButton#roundBadge {{
     color: #0f172a;
     background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #fff7b0, stop:0.45 #f7c948, stop:1 #a16207);
     border: 1px solid #fde68a;
@@ -58,6 +58,9 @@ QLabel#roundBadge {{
     padding: 8px 14px;
     font-weight: 900;
     font-size: 18px;
+}}
+QPushButton#roundBadge:hover {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ffffff, stop:0.45 #facc15, stop:1 #b45309);
 }}
 QLabel#roomCode, QLabel#statusText {{
     color: #cbd5e1;

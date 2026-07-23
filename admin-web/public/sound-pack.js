@@ -1,4 +1,8 @@
 (function () {
+  window.OLYMPIA_AUDIO_CONFIG = {
+    defaultVolume: 0.5,
+    extension: ".mp3",
+  };
   window.OLYMPIA_SOUND_GROUPS = [
     {
       key: "starting",
@@ -58,6 +62,7 @@
         ["finish.5", "Đếm giờ 5s", "/sounds/Finish/5Seconds.mp3"],
         ["finish.15", "Đếm giờ 15s", "/sounds/Finish/15Seconds.mp3"],
         ["finish.20", "Đếm giờ 20s", "/sounds/Finish/20Seconds.mp3"],
+        ["finish.30", "Đếm giờ 30s", "/sounds/Finish/Practice30Seconds.mp3"],
         ["finish.grant", "Bấm chuông giành quyền", "/sounds/Finish/Grant.mp3"],
         ["finish.correct", "Trả lời đúng", "/sounds/Finish/CorrectFinish.mp3"],
         ["finish.wrong", "Trả lời sai", "/sounds/Finish/WrongFinish.mp3"],

@@ -1,0 +1,31 @@
+<%- include('partials/header', { user, tables, current }) %>
+
+<section class="page-head">
+  <div>
+    <h1>Quản lý server</h1>
+    <p>Chọn đúng server trước khi cấu hình phòng hoặc quản lý thí sinh của server đó.</p>
+  </div>
+</section>
+
+<% if (error) { %>
+  <div class="alert"><%= error %></div>
+<% } %>
+
+<section class="server-choice-grid">
+  <% servers.forEach((server) => { %>
+    <form class="panel server-choice-card" method="post" action="/server/select">
+      <input type="hidden" name="server_slot_id" value="<%= server.id %>">
+      <input type="hidden" name="next" value="<%= nextUrl %>">
+      <div>
+        <span class="pill"><%= server.status %></span>
+        <h2><%= server.display_name %></h2>
+        <p>Mã server: <%= server.server_key %></p>
+      </div>
+      <button class="primary" type="submit" <%= server.status === 'maintenance' ? 'disabled' : '' %>>
+        Vào quản lý server
+      </button>
+    </form>
+  <% }) %>
+</section>
+
+<%- include('partials/footer') %>

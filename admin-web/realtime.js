@@ -10,6 +10,15 @@ const {
 const stateCache = new Map();
 const warmupNoBuzzTimers = new Map();
 const warmupAnswerTimers = new Map();
+const SCREEN_ROLES = Object.freeze({
+  STUDENT: "STUDENT",
+  MC: "MC",
+  SCOREBOARD: "SCOREBOARD",
+  VIEWER: "VIEWER",
+});
+const CONTROL_SCREEN_ROLE = "CONTROL";
+const SCREEN_ROLE_VALUES = new Set([...Object.values(SCREEN_ROLES), CONTROL_SCREEN_ROLE]);
+const DEFAULT_AUDIO_VOLUME = 0.5;
 
 const DEFAULT_STATE = {
   rulePreset: DEFAULT_RULE_PRESET,
@@ -38,8 +47,11 @@ const DEFAULT_STATE = {
   timer: {
     seconds: 0,
     remaining: 0,
+    durationMs: 0,
+    remainingMs: 0,
     running: false,
     startedAt: null,
+    startedAtMs: null,
   },
   ring: {
     locked: true,
@@ -51,12 +63,16 @@ const DEFAULT_STATE = {
     key: null,
     text: "",
     answer: "",
+    note: "",
     mediaUrl: "",
     visible: false,
     answerVisible: false,
     starConfirmed: false,
     starEnabled: false,
     point: 0,
+  },
+  history: {
+    questions: [],
   },
   puzzle: {
     selectedRow: null,
@@ -68,6 +84,7 @@ const DEFAULT_STATE = {
     preloadRequested: false,
     showFirstImageBeforeTimer: false,
     imageSequence: [],
+    imageDurations: [],
     timings: getRulePreset(DEFAULT_RULE_PRESET).speed.questionSeconds,
     questionIndex: 1,
   },
@@ -100,6 +117,7 @@ const DEFAULT_STATE = {
     url: "",
     title: "",
     startedAt: null,
+    volume: DEFAULT_AUDIO_VOLUME,
   },
   notice: "",
   answers: [],
@@ -156,6 +174,148 @@ function toIsoDateTime(value) {
   return date ? date.toISOString() : null;
 }
 
+function normalizedScreenRole(value, fallback = SCREEN_ROLES.VIEWER) {
+  const role = String(value || "").trim().toUpperCase();
+  return SCREEN_ROLE_VALUES.has(role) ? role : fallback;
+}
+
+function canControlSocket(socket) {
+  return socket.data.screenRole === CONTROL_SCREEN_ROLE || !socket.data.screenRole;
+}
+
+function isMp3AudioUrl(value) {
+  const raw = String(value || "").trim();
+  return /\.mp3(?:[?#].*)?$/i.test(raw);
+}
+
+function timerStartMs(timer = {}) {
+  const explicit = Number(timer.startedAtMs);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const parsed = parseDateTime(timer.startedAt);
+  return parsed ? parsed.getTime() : null;
+}
+
+function timerDurationMs(timer = {}) {
+  const explicit = Number(timer.durationMs);
+  if (Number.isFinite(explicit) && explicit >= 0) return Math.round(explicit);
+  const seconds = Number(timer.seconds || 0);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : 0;
+}
+
+function timerRemainingMs(timer = {}) {
+  const durationMs = timerDurationMs(timer);
+  const explicit = Number(timer.remainingMs);
+  const fallbackSeconds = Number(timer.remaining);
+  let fallbackMs = Number.isFinite(explicit)
+    ? explicit
+    : (Number.isFinite(fallbackSeconds) ? fallbackSeconds * 1000 : durationMs);
+  if (timer.running) {
+    const startedAtMs = timerStartMs(timer);
+    if (startedAtMs) fallbackMs = durationMs - (Date.now() - startedAtMs);
+  }
+  return Math.max(0, Math.min(durationMs || Math.max(0, fallbackMs), Math.round(fallbackMs)));
+}
+
+function normalizeTimer(timer = {}) {
+  const durationMs = timerDurationMs(timer);
+  const remainingMs = timerRemainingMs({ ...timer, durationMs });
+  const startedAtMs = timer.running ? (timerStartMs(timer) || Date.now()) : timerStartMs(timer);
+  return {
+    ...timer,
+    seconds: durationMs / 1000,
+    remaining: Math.ceil(remainingMs / 1000),
+    durationMs,
+    remainingMs,
+    running: Boolean(timer.running) && durationMs > 0,
+    startedAt: startedAtMs ? new Date(startedAtMs).toISOString() : null,
+    startedAtMs: startedAtMs || null,
+  };
+}
+
+function timerSnapshot(timer = {}) {
+  return normalizeTimer(timer);
+}
+
+function startTimerPatch(seconds) {
+  const safeSeconds = Math.max(0, Number(seconds || 0));
+  const durationMs = Math.round(safeSeconds * 1000);
+  const startedAtMs = Date.now();
+  return {
+    seconds: safeSeconds,
+    remaining: Math.ceil(durationMs / 1000),
+    durationMs,
+    remainingMs: durationMs,
+    running: durationMs > 0,
+    startedAt: new Date(startedAtMs).toISOString(),
+    startedAtMs,
+  };
+}
+
+function stoppedTimerPatch(overrides = {}) {
+  return normalizeTimer({
+    seconds: 0,
+    remaining: 0,
+    durationMs: 0,
+    remainingMs: 0,
+    running: false,
+    startedAt: null,
+    startedAtMs: null,
+    ...overrides,
+  });
+}
+
+function normalizeHistoryQuestions(history) {
+  const items = Array.isArray(history?.questions) ? history.questions : [];
+  return {
+    questions: items
+      .filter((item) => item && (item.key || item.text || item.answer))
+      .slice(-80)
+      .map((item) => ({
+        key: item.key || "",
+        round: item.round || "setup",
+        text: String(item.text || ""),
+        answer: String(item.answer || ""),
+        note: String(item.note || ""),
+        mediaUrl: String(item.mediaUrl || ""),
+        point: Number(item.point || 0),
+        answerVisible: Boolean(item.answerVisible),
+        shownAt: item.shownAt || item.startedAt || new Date().toISOString(),
+      })),
+  };
+}
+
+function questionHistoryPatch(current, nextPatch, nextRound) {
+  if (!nextPatch.question) return null;
+  const mergedQuestion = deepMerge(current.question || {}, nextPatch.question);
+  const key = mergedQuestion.key || current.question?.key || "";
+  if (!key || !mergedQuestion.visible) return null;
+  const hasContent = [mergedQuestion.text, mergedQuestion.answer, mergedQuestion.note, mergedQuestion.mediaUrl]
+    .some((value) => String(value || "").trim());
+  if (!hasContent) return null;
+
+  const history = normalizeHistoryQuestions(current.history).questions;
+  const index = history.findIndex((item) => item.key === key);
+  const existing = index >= 0 ? history[index] : {};
+  const item = {
+    ...existing,
+    key,
+    round: existing.round || nextRound || current.round || "setup",
+    text: String(mergedQuestion.text || ""),
+    answer: String(mergedQuestion.answer || ""),
+    note: String(mergedQuestion.note || ""),
+    mediaUrl: String(mergedQuestion.mediaUrl || ""),
+    point: Number(mergedQuestion.point || existing.point || 0),
+    answerVisible: Boolean(mergedQuestion.answerVisible),
+    shownAt: existing.shownAt || new Date().toISOString(),
+  };
+  if (index >= 0) {
+    history[index] = item;
+  } else {
+    history.push(item);
+  }
+  return { questions: history.slice(-80) };
+}
+
 function normalizeText(value) {
   return String(value || "")
     .trim()
@@ -187,6 +347,8 @@ function normalizeState(rawState) {
     merged.finish.starLockedUntilDecision = true;
     merged.finish.stealWindowSeconds = merged.rules.finish.stealWindowSeconds;
   }
+  merged.timer = normalizeTimer(merged.timer);
+  merged.history = normalizeHistoryQuestions(merged.history);
   return merged;
 }
 
@@ -225,6 +387,91 @@ async function getRoomByCode(roomCode) {
   return one("SELECT * FROM match_rooms WHERE room_code = ?", [roomCode]);
 }
 
+function roomStatusRank(status) {
+  return { live: 1, paused: 2, scheduled: 3, draft: 4 }[String(status || "")] || 99;
+}
+
+function roomFromLoginRow(row) {
+  return {
+    id: row.room_id,
+    question_set_id: row.question_set_id,
+    server_slot_id: row.server_slot_id,
+    server_name: row.server_name,
+    purpose: row.purpose,
+    room_code: row.room_code,
+    quick_token: row.quick_token,
+    login_password: row.login_password,
+    recovery_password: row.recovery_password,
+    status: row.room_status,
+    scheduled_from: row.scheduled_from,
+    scheduled_to: row.scheduled_to,
+    created_at: row.room_created_at,
+  };
+}
+
+function contestantFromLoginRow(row) {
+  return {
+    id: row.contestant_id,
+    display_name: row.display_name,
+    school: row.school,
+    avatar_url: row.avatar_url,
+    seat_no: row.seat_no,
+    score: row.score,
+    is_active: row.is_active,
+  };
+}
+
+async function findContestantLogin(loginCode, preferredRoomId = null) {
+  const code = String(loginCode || "").trim();
+  if (!code) return null;
+  const rows = await query(
+    `SELECT c.id AS contestant_id,
+            c.display_name,
+            c.school,
+            c.avatar_url,
+            c.seat_no,
+            c.score,
+            c.is_active,
+            r.id AS room_id,
+            r.question_set_id,
+            r.server_slot_id,
+            r.server_name,
+            r.purpose,
+            r.room_code,
+            r.quick_token,
+            r.login_password,
+            r.recovery_password,
+            r.status AS room_status,
+            r.scheduled_from,
+            r.scheduled_to,
+            r.created_at AS room_created_at
+     FROM contestants c
+     JOIN match_rooms r ON r.id = c.room_id
+     WHERE c.is_active = 1
+       AND (c.login_code = ? OR CAST(c.id AS CHAR) = ?)
+       AND r.status IN ('live', 'paused', 'scheduled', 'draft')
+     ORDER BY
+       CASE WHEN r.id = ? THEN 0 ELSE 1 END,
+       FIELD(r.status, 'live', 'paused', 'scheduled', 'draft'),
+       r.scheduled_from DESC,
+       r.id DESC
+     LIMIT 10`,
+    [code, code, Number(preferredRoomId || 0)],
+  );
+  if (!rows.length) return null;
+
+  const preferred = rows.find((row) => Number(row.room_id) === Number(preferredRoomId || 0));
+  if (preferred) return { room: roomFromLoginRow(preferred), contestant: contestantFromLoginRow(preferred) };
+
+  const bestRank = roomStatusRank(rows[0].room_status);
+  const bestRows = rows.filter((row) => roomStatusRank(row.room_status) === bestRank);
+  const distinctRooms = new Set(bestRows.map((row) => Number(row.room_id)));
+  if (distinctRooms.size > 1) {
+    return { ambiguous: true, matches: bestRows.map((row) => ({ room: roomFromLoginRow(row), contestant: contestantFromLoginRow(row) })) };
+  }
+  return { room: roomFromLoginRow(bestRows[0]), contestant: contestantFromLoginRow(bestRows[0]) };
+}
+
 async function ensureRoomSettings(roomId) {
   await query(
     "INSERT IGNORE INTO room_settings (room_id, state_json) VALUES (?, ?)",
@@ -261,7 +508,8 @@ async function loadRoomState(roomId) {
   state.scoring.candidateCount = Number(settings.candidate_count || state.scoring.candidateCount || 4);
   state.timer.seconds = Number(settings.timer_seconds || state.timer.seconds || 0);
   state.timer.running = asBool(settings.timer_running);
-  state.timer.startedAt = toIsoDateTime(settings.timer_started_at) || toIsoDateTime(state.timer.startedAt);
+  state.timer.startedAt = toIsoDateTime(state.timer.startedAt) || toIsoDateTime(settings.timer_started_at);
+  state.timer = normalizeTimer(state.timer);
   state.ring.delaySeconds = Number(settings.ring_delay_seconds || state.ring.delaySeconds || 0);
   state.ring.locked = asBool(settings.ring_locked);
   state.question.text = settings.current_question_text || state.question.text;
@@ -328,6 +576,21 @@ async function persistState(roomId, state) {
 
 function normalizePatch(current, patch) {
   let nextPatch = clone(patch || {});
+  if (nextPatch.timer) {
+    if (nextPatch.timer.seconds !== undefined && nextPatch.timer.durationMs === undefined) {
+      nextPatch.timer.durationMs = Math.round(Number(nextPatch.timer.seconds || 0) * 1000);
+    }
+    if (nextPatch.timer.remaining !== undefined && nextPatch.timer.remainingMs === undefined) {
+      nextPatch.timer.remainingMs = Math.round(Number(nextPatch.timer.remaining || 0) * 1000);
+    }
+    if (nextPatch.timer.startedAt === null) {
+      nextPatch.timer.startedAtMs = null;
+    }
+    if (nextPatch.timer.running === false && nextPatch.timer.remainingMs === undefined && nextPatch.timer.remaining === undefined) {
+      nextPatch.timer = { ...timerSnapshot(current.timer), ...nextPatch.timer };
+    }
+    nextPatch.timer = normalizeTimer(deepMerge(current.timer || {}, nextPatch.timer));
+  }
   if (nextPatch.rulePreset && isKnownPreset(nextPatch.rulePreset)) {
     const preset = getRulePreset(nextPatch.rulePreset);
     nextPatch = deepMerge(nextPatch, {
@@ -357,6 +620,10 @@ function normalizePatch(current, patch) {
   if (nextRound !== "finish" && nextPatch.question) {
     nextPatch.question.starConfirmed = true;
     nextPatch.question.starEnabled = false;
+  }
+  const historyPatch = questionHistoryPatch(current, nextPatch, nextRound);
+  if (historyPatch) {
+    nextPatch.history = historyPatch;
   }
   return nextPatch;
 }
@@ -414,7 +681,7 @@ async function buildNextWarmupPatch(room, state, reason = "manual") {
   if (nextIndex > maxQuestions) {
     return {
       warmup: { finished: true, autoAdvanceRequestedAt: new Date().toISOString(), buzzedContestantId: null },
-      timer: { seconds: 0, remaining: 0, running: false, startedAt: null },
+      timer: stoppedTimerPatch(),
       ring: { locked: true, firstContestantId: null, lastStatus: {} },
       question: { visible: false, answerVisible: false },
       notice: "Khoi dong: da het so cau theo preset.",
@@ -429,7 +696,7 @@ async function buildNextWarmupPatch(room, state, reason = "manual") {
   if (!row) {
     return {
       warmup: { finished: true, autoAdvanceRequestedAt: new Date().toISOString(), buzzedContestantId: null },
-      timer: { seconds: 0, remaining: 0, running: false, startedAt: null },
+      timer: stoppedTimerPatch(),
       ring: { locked: true, firstContestantId: null, lastStatus: {} },
       question: { visible: false, answerVisible: false },
       notice: "Khởi động: không còn câu hỏi trong bộ đề của phòng.",
@@ -456,12 +723,14 @@ async function buildNextWarmupPatch(room, state, reason = "manual") {
       starEnabled: false,
       point: rules.warmup.correctPoints,
     },
-    timer: {
-      seconds,
-      remaining: seconds,
-      running: mode === "individual",
-      startedAt: mode === "individual" ? new Date().toISOString() : null,
-    },
+    timer: mode === "individual"
+      ? startTimerPatch(seconds)
+      : stoppedTimerPatch({
+        seconds,
+        remaining: seconds,
+        durationMs: Number(seconds || 0) * 1000,
+        remainingMs: Number(seconds || 0) * 1000,
+      }),
     ring: { locked: mode !== "common", firstContestantId: null, lastStatus: {} },
   };
 }
@@ -588,8 +857,13 @@ async function setupRealtime(io) {
         });
       });
     };
+    const requireControl = () => {
+      if (canControlSocket(socket)) return true;
+      socket.emit("error:message", "Man hinh nay chi duoc xem, khong co quyen dieu khien tran dau.");
+      return false;
+    };
 
-    on("room:join", async ({ roomCode }) => {
+    on("room:join", async ({ roomCode, screenRole, role }) => {
       const room = await getRoomByCode(roomCode);
       if (!room) {
         socket.emit("error:message", "Khong tim thay phong.");
@@ -597,36 +871,51 @@ async function setupRealtime(io) {
       }
       socket.join(room.room_code);
       socket.data.room = room;
+      socket.data.screenRole = normalizedScreenRole(screenRole || role, SCREEN_ROLES.VIEWER);
       const state = await loadRoomState(room.id);
       socket.emit("state:init", state);
     });
 
-    on("candidate:login", async ({ loginCode }) => {
-      if (!socket.data.room) return;
+    on("candidate:login", async ({ loginCode, screenRole, role }) => {
       const code = String(loginCode || "").trim();
       if (!code) {
         socket.emit("candidate:login:error", "Thiếu mã ID thí sinh.");
         return;
       }
-      const contestant = await one(
-        `SELECT id, display_name, school, avatar_url, seat_no, score, is_active
-         FROM contestants
-         WHERE room_id = ?
-           AND is_active = 1
-           AND (login_code = ? OR CAST(id AS CHAR) = ?)
-         LIMIT 1`,
-        [socket.data.room.id, code, code],
-      );
-      if (!contestant) {
+      socket.data.screenRole = normalizedScreenRole(screenRole || role, SCREEN_ROLES.STUDENT);
+      const login = await findContestantLogin(code, socket.data.room?.id);
+      if (!login) {
         socket.emit("candidate:login:error", "Mã ID không hợp lệ hoặc tài khoản đã bị khóa.");
         return;
       }
+      if (login.ambiguous) {
+        socket.emit("candidate:login:error", "Mã ID này đang trùng ở nhiều phòng/server đang mở. Admin cần đổi mã ID thí sinh cho duy nhất.");
+        return;
+      }
+      const { room, contestant } = login;
+      if (!socket.data.room || Number(socket.data.room.id) !== Number(room.id)) {
+        if (socket.data.room?.room_code) socket.leave(socket.data.room.room_code);
+        socket.join(room.room_code);
+        socket.data.room = room;
+        const state = await loadRoomState(room.id);
+        socket.emit("state:init", state);
+      }
       socket.data.contestantId = Number(contestant.id);
-      socket.emit("candidate:login:ok", { contestant });
+      socket.emit("candidate:login:ok", {
+        screenRole: socket.data.screenRole,
+        contestant,
+        room: {
+          id: room.id,
+          room_code: room.room_code,
+          server_slot_id: room.server_slot_id,
+          server_name: room.server_name,
+          status: room.status,
+        },
+      });
     });
 
     on("admin:patch", async ({ patch }) => {
-      if (!socket.data.room) return;
+      if (!socket.data.room || !requireControl()) return;
       const current = stateCache.get(socket.data.room.id) || (await loadRoomState(socket.data.room.id));
       const nextRound = patch?.round || current.round;
       const nextRules = patch?.rulePreset ? getRulePreset(patch.rulePreset) : activeRules(current);
@@ -639,21 +928,21 @@ async function setupRealtime(io) {
     });
 
     on("timer:start", async ({ seconds } = {}) => {
-      if (!socket.data.room) return;
+      if (!socket.data.room || !requireControl()) return;
       const state = stateCache.get(socket.data.room.id) || (await loadRoomState(socket.data.room.id));
       const derivedSeconds = deriveTimerSeconds(state, seconds);
       await patchState(io, socket.data.room, {
-        timer: { seconds: derivedSeconds, remaining: derivedSeconds, running: true, startedAt: new Date().toISOString() },
+        timer: startTimerPatch(derivedSeconds),
       });
     });
 
     on("timer:stop", async () => {
-      if (!socket.data.room) return;
+      if (!socket.data.room || !requireControl()) return;
       await patchState(io, socket.data.room, { timer: { running: false } });
     });
 
     on("ring:set", async ({ locked, delaySeconds }) => {
-      if (!socket.data.room) return;
+      if (!socket.data.room || !requireControl()) return;
       clearScheduledTimer(warmupNoBuzzTimers, socket.data.room.id);
       clearScheduledTimer(warmupAnswerTimers, socket.data.room.id);
       const state = stateCache.get(socket.data.room.id) || (await loadRoomState(socket.data.room.id));
@@ -679,17 +968,21 @@ async function setupRealtime(io) {
     });
 
     on("media:play", async ({ url, title }) => {
-      if (!socket.data.room) return;
-      await patchState(io, socket.data.room, { media: { playing: true, url: url || "", title: title || "", startedAt: new Date().toISOString() } });
+      if (!socket.data.room || !requireControl()) return;
+      if (!isMp3AudioUrl(url)) {
+        socket.emit("error:message", "Trinh quan ly am thanh chi nhan file .mp3.");
+        return;
+      }
+      await patchState(io, socket.data.room, { media: { playing: true, url: url || "", title: title || "", startedAt: new Date().toISOString(), volume: DEFAULT_AUDIO_VOLUME } });
     });
 
     on("media:stop", async () => {
-      if (!socket.data.room) return;
-      await patchState(io, socket.data.room, { media: { playing: false, url: "", title: "", startedAt: null } });
+      if (!socket.data.room || !requireControl()) return;
+      await patchState(io, socket.data.room, { media: { playing: false, url: "", title: "", startedAt: null, volume: DEFAULT_AUDIO_VOLUME } });
     });
 
     on("warmup:next", async () => {
-      if (!socket.data.room) return;
+      if (!socket.data.room || !requireControl()) return;
       await advanceWarmupQuestion(io, socket.data.room);
     });
 
@@ -859,14 +1152,14 @@ async function setupRealtime(io) {
       if (state.round === "warmup" && state.warmup?.mode === "common" && status === "accepted") {
         clearScheduledTimer(warmupNoBuzzTimers, socket.data.room.id);
         const seconds = Number(rules.warmup.commonAnswerSeconds || 5);
-        patch.timer = { seconds, remaining: seconds, running: true, startedAt: new Date().toISOString() };
+        patch.timer = startTimerPatch(seconds);
         patch.warmup = { buzzedContestantId: Number(contestantId) };
         scheduleWarmupNoAnswer(io, socket.data.room, state, contestantId, state.question?.key || null);
       }
       if (state.round === "finish" && status === "accepted") {
         const seconds = Number(rules.finish.stealWindowSeconds || 5);
         patch.finish = { stealMode: true };
-        patch.timer = { seconds, remaining: seconds, running: true, startedAt: new Date().toISOString() };
+        patch.timer = startTimerPatch(seconds);
       }
 
       await patchState(io, socket.data.room, patch);
@@ -875,7 +1168,7 @@ async function setupRealtime(io) {
     });
 
     on("admin:grade", async ({ answerId, contestantId, isCorrect, points }) => {
-      if (!socket.data.room) return;
+      if (!socket.data.room || !requireControl()) return;
       const state = stateCache.get(socket.data.room.id) || (await loadRoomState(socket.data.room.id));
       const delta = points === undefined || points === null || points === "" ? computeManualDefaultPoints(state, Boolean(isCorrect)) : Number(points || 0);
       await query("UPDATE answer_submissions SET is_correct = ?, awarded_points = ? WHERE id = ?", [
@@ -906,7 +1199,7 @@ async function setupRealtime(io) {
     });
 
     on("admin:score-set", async ({ contestantId, score }) => {
-      if (!socket.data.room || !contestantId) return;
+      if (!socket.data.room || !requireControl() || !contestantId) return;
       const state = stateCache.get(socket.data.room.id) || (await loadRoomState(socket.data.room.id));
       const nextScore = state.scoring.allowNegativeScore ? Number(score || 0) : Math.max(0, Number(score || 0));
       await query("UPDATE contestants SET score = ? WHERE id = ? AND room_id = ?", [nextScore, contestantId, socket.data.room.id]);
@@ -915,7 +1208,7 @@ async function setupRealtime(io) {
     });
 
     on("admin:candidate-active", async ({ contestantId, active }) => {
-      if (!socket.data.room || !contestantId) return;
+      if (!socket.data.room || !requireControl() || !contestantId) return;
       await query("UPDATE contestants SET is_active = ? WHERE id = ? AND room_id = ?", [
         active ? 1 : 0,
         contestantId,
@@ -926,7 +1219,7 @@ async function setupRealtime(io) {
     });
 
     on("round:reset", async ({ round }) => {
-      if (!socket.data.room) return;
+      if (!socket.data.room || !requireControl()) return;
       clearScheduledTimer(warmupNoBuzzTimers, socket.data.room.id);
       clearScheduledTimer(warmupAnswerTimers, socket.data.room.id);
       await query("DELETE FROM answer_submissions WHERE room_id = ? AND round_key = ?", [socket.data.room.id, round]);
@@ -935,9 +1228,9 @@ async function setupRealtime(io) {
       const patch = {
         round,
         warmup: { questionIndex: 0, buzzedContestantId: null, autoAdvanceRequestedAt: null, finished: false },
-        timer: { running: false, seconds: 0, remaining: 0, startedAt: null },
+        timer: stoppedTimerPatch(),
         ring: { locked: true, firstContestantId: null, lastStatus: {} },
-        question: { key: null, text: "", answer: "", mediaUrl: "", visible: false, answerVisible: false, starConfirmed: false, starEnabled: false, point: 0 },
+        question: { key: null, text: "", answer: "", note: "", mediaUrl: "", visible: false, answerVisible: false, starConfirmed: false, starEnabled: false, point: 0 },
         puzzle: { selectedRow: null, revealed: [false, false, false, false, false], centerSelected: false },
         speed: { questionIndex: 1, timings: rules.speed?.questionSeconds || [20, 20, 30, 30] },
         finish: { activePackagePoints: rules.finish?.packages?.[0] || 20, stealMode: false, activeContestantId: null },
@@ -989,6 +1282,7 @@ async function setupRealtime(io) {
 
 module.exports = {
   DEFAULT_STATE,
+  SCREEN_ROLES,
   RULE_PRESETS,
   getDefaultRoom,
   getRoomByCode,

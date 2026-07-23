@@ -12,6 +12,8 @@ try:
 except ImportError:  # pragma: no cover - handled in the UI at runtime
     socketio = None
 
+SCREEN_ROLE = "STUDENT"
+
 
 def deep_merge(target: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
     next_state = deepcopy(target) if isinstance(target, dict) else {}
@@ -43,18 +45,60 @@ def parse_started_at(value: str | None) -> datetime | None:
         return None
 
 
-def seconds_remaining(timer: dict[str, Any] | None) -> int:
+def timer_duration_ms(timer: dict[str, Any] | None) -> int:
     if not timer:
         return 0
-    total = int(float(timer.get("seconds") or 0))
-    fallback = int(float(timer.get("remaining") if timer.get("remaining") is not None else total))
-    if not timer.get("running"):
-        return max(0, fallback)
+    explicit = timer.get("durationMs")
+    if explicit is not None:
+        try:
+            return max(0, int(round(float(explicit))))
+        except (TypeError, ValueError):
+            pass
+    try:
+        return max(0, int(round(float(timer.get("seconds") or 0) * 1000)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def timer_started_ms(timer: dict[str, Any] | None) -> int | None:
+    if not timer:
+        return None
+    explicit = timer.get("startedAtMs")
+    if explicit is not None:
+        try:
+            value = int(round(float(explicit)))
+            return value if value > 0 else None
+        except (TypeError, ValueError):
+            pass
     started = parse_started_at(timer.get("startedAt"))
     if not started:
+        return None
+    return int(round(started.timestamp() * 1000))
+
+
+def remaining_milliseconds(timer: dict[str, Any] | None) -> int:
+    if not timer:
+        return 0
+    total = timer_duration_ms(timer)
+    try:
+        fallback = int(round(float(timer.get("remainingMs"))))
+    except (TypeError, ValueError):
+        try:
+            fallback = int(round(float(timer.get("remaining") if timer.get("remaining") is not None else total / 1000) * 1000))
+        except (TypeError, ValueError):
+            fallback = total
+    if not timer.get("running"):
+        return max(0, min(total or fallback, fallback))
+    started_ms = timer_started_ms(timer)
+    if not started_ms:
         return max(0, fallback)
-    elapsed = int((datetime.now(UTC) - started).total_seconds())
-    return max(0, total - elapsed)
+    elapsed_ms = int(round(datetime.now(UTC).timestamp() * 1000)) - started_ms
+    return max(0, min(total, total - elapsed_ms))
+
+
+def seconds_remaining(timer: dict[str, Any] | None) -> int:
+    remaining_ms = remaining_milliseconds(timer)
+    return int((remaining_ms + 999) // 1000)
 
 
 class RealtimeClient(QObject):
@@ -75,11 +119,11 @@ class RealtimeClient(QObject):
         self._sio: Any | None = None
         self._connect_thread: threading.Thread | None = None
 
-    def connect_to(self, server_url: str, room_code: str) -> None:
+    def connect_to(self, server_url: str, room_code: str = "") -> None:
         self.server_url = server_url.rstrip("/")
         self.room_code = room_code.strip()
-        if not self.server_url or not self.room_code:
-            self.error_message.emit("Vui lòng nhập địa chỉ admin và mã phòng thi.")
+        if not self.server_url:
+            self.error_message.emit("Vui lòng cấu hình địa chỉ admin server.")
             return
         if socketio is None:
             self.error_message.emit(
@@ -87,7 +131,8 @@ class RealtimeClient(QObject):
             )
             return
         if self._sio and self._sio.connected:
-            self._sio.emit("room:join", {"roomCode": self.room_code})
+            if self.room_code:
+                self._sio.emit("room:join", {"roomCode": self.room_code, "screenRole": SCREEN_ROLE})
             return
 
         self._sio = socketio.Client(reconnection=True, logger=False, engineio_logger=False)
@@ -108,13 +153,13 @@ class RealtimeClient(QObject):
             self.login_error.emit("Vui lòng nhập mã ID thí sinh.")
             return
         if not self._sio or not self._sio.connected:
-            self.login_error.emit("Chưa kết nối phòng thi.")
+            self.login_error.emit("Chưa kết nối backend.")
             return
-        self._sio.emit("candidate:login", {"loginCode": code})
+        self._sio.emit("candidate:login", {"loginCode": code, "screenRole": SCREEN_ROLE})
 
     def submit_answer(self, contestant_id: int, answer_text: str, question_key: str | None = None) -> None:
         if not self._sio or not self._sio.connected:
-            self.error_message.emit("Chưa kết nối phòng thi.")
+            self.error_message.emit("Chưa kết nối backend.")
             return
         self._sio.emit(
             "candidate:answer",
@@ -127,13 +172,13 @@ class RealtimeClient(QObject):
 
     def buzz(self, contestant_id: int) -> None:
         if not self._sio or not self._sio.connected:
-            self.error_message.emit("Chưa kết nối phòng thi.")
+            self.error_message.emit("Chưa kết nối backend.")
             return
         self._sio.emit("candidate:buzz", {"contestantId": int(contestant_id)})
 
     def submit_wall(self, contestant_id: int, cell_ids: list[int]) -> None:
         if not self._sio or not self._sio.connected:
-            self.error_message.emit("Chưa kết nối phòng thi.")
+            self.error_message.emit("Chưa kết nối backend.")
             return
         self._sio.emit("wall:submit", {"contestantId": int(contestant_id), "cellIds": cell_ids})
 
@@ -148,7 +193,8 @@ class RealtimeClient(QObject):
         @sio.event
         def connect() -> None:
             self.connected_flag = True
-            sio.emit("room:join", {"roomCode": self.room_code})
+            if self.room_code:
+                sio.emit("room:join", {"roomCode": self.room_code, "screenRole": SCREEN_ROLE})
             self.connected.emit()
 
         @sio.event
@@ -168,7 +214,11 @@ class RealtimeClient(QObject):
 
         @sio.on("candidate:login:ok")
         def on_login_ok(payload: dict[str, Any] | None = None) -> None:
-            self.login_ok.emit(payload or {})
+            data = payload or {}
+            room = data.get("room") if isinstance(data.get("room"), dict) else {}
+            if room.get("room_code"):
+                self.room_code = str(room.get("room_code") or "")
+            self.login_ok.emit(data)
 
         @sio.on("candidate:login:error")
         def on_login_error(message: str = "") -> None:

@@ -19,6 +19,7 @@ async function runSqlFile(filePath) {
 }
 
 async function ensureRealtimeSchema() {
+  await ensureAdminAccessModel();
   await addColumnIfMissing("question_sets", "set_code", "VARCHAR(40) NULL UNIQUE AFTER id");
   await ensureDefaultQuestionSet();
   await ensureCoreQuestionSetScope();
@@ -36,6 +37,7 @@ async function ensureRealtimeSchema() {
   await pool.query("UPDATE match_rooms SET quick_token = CONCAT(room_code, '-QUICK') WHERE quick_token IS NULL OR quick_token = ''");
   await ensureNonNullOperationalData();
   await ensureRoomServerSlots();
+  await ensureAdminAccessModel();
 }
 
 async function addColumnIfMissing(tableName, columnName, definition) {
@@ -114,6 +116,47 @@ async function ensureDefaultQuestionSet() {
        is_active = 1`,
   );
   await pool.query("UPDATE question_sets SET set_code = CONCAT('SET-', id) WHERE set_code IS NULL OR set_code = ''");
+}
+
+async function ensureAdminAccessModel() {
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS admins (
+       id INT AUTO_INCREMENT PRIMARY KEY,
+       username VARCHAR(50) NOT NULL UNIQUE,
+       password_hash CHAR(64) NOT NULL,
+       display_name VARCHAR(100) NOT NULL DEFAULT '',
+       role ENUM('admin', 'bqt') NOT NULL DEFAULT 'admin',
+       server_slot_id INT NULL,
+       is_active TINYINT(1) NOT NULL DEFAULT 1,
+       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  );
+  await addColumnIfMissing("admins", "display_name", "VARCHAR(100) NOT NULL DEFAULT '' AFTER password_hash");
+  await addColumnIfMissing("admins", "role", "ENUM('admin', 'bqt') NOT NULL DEFAULT 'admin' AFTER display_name");
+  await addColumnIfMissing("admins", "server_slot_id", "INT NULL AFTER role");
+  await addColumnIfMissing("admins", "is_active", "TINYINT(1) NOT NULL DEFAULT 1 AFTER server_slot_id");
+  await pool.query("UPDATE admins SET role = 'admin' WHERE role IS NULL OR role = ''");
+  await pool.query("UPDATE admins SET is_active = 1 WHERE is_active IS NULL");
+  await pool.query("UPDATE admins SET display_name = username WHERE display_name IS NULL OR display_name = ''");
+  await pool.query(
+    `INSERT INTO admins (username, password_hash, display_name, role, is_active)
+     VALUES ('admin', SHA2('admin', 256), 'Admin tổng quản', 'admin', 1)
+     ON DUPLICATE KEY UPDATE
+       role = 'admin',
+       is_active = 1,
+       display_name = COALESCE(NULLIF(display_name, ''), VALUES(display_name))`,
+  );
+  await ensureIndex("admins", "idx_admins_server_slot", ["server_slot_id"]);
+  if (await tableExists("server_slots")) {
+    await pool.query(
+      `UPDATE admins a
+       LEFT JOIN server_slots s ON s.id = a.server_slot_id
+       SET a.server_slot_id = NULL
+       WHERE a.server_slot_id IS NOT NULL
+         AND s.id IS NULL`,
+    );
+    await ensureForeignKey("admins", "fk_admins_server_slot", ["server_slot_id"], "server_slots", ["id"], "SET NULL");
+  }
 }
 
 async function ensureScopedColumn(tableName, afterColumn = "id", nullable = false) {

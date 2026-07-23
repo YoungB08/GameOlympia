@@ -18,7 +18,7 @@
       </div>
       <%
         const navTabs = [
-          { label: 'Chọn server', section: 'server-booking' },
+          { label: 'Quản lý server', section: 'server-booking' },
           { label: 'Cài đặt phòng', section: 'room-setup' },
           { label: 'Khởi động', section: 'round-control', round: 'warmup', seconds: 5 },
           { label: 'Vượt chướng ngại vật', section: 'round-tools', round: 'obstacle', seconds: 15 },
@@ -41,26 +41,25 @@
         ><%= tab.label %></button>
       <% }) %>
       <div class="btn-row">
-        <a class="btn" href="/dashboard">Quản trị dữ liệu</a>
-        <a class="btn" href="/admin/export.json">Xuất JSON</a>
-        <a class="btn" href="/admin/export.xlsx">Xuất Excel</a>
+        <% if (canSwitchServer) { %>
+          <a class="btn" href="/server/select?next=/technician">Đổi server</a>
+        <% } %>
+        <a class="btn" href="/dashboard">Tổng quan</a>
+        <% if (user && user.role !== 'bqt') { %>
+          <a class="btn" href="/admin/export.json">Xuất JSON</a>
+          <a class="btn" href="/admin/export.xlsx">Xuất Excel</a>
+        <% } %>
       </div>
     </aside>
 
     <main class="tech-main">
       <section class="section-grid" id="server-booking" data-section="server-booking">
         <form class="glass" method="post" action="/rooms/book">
-          <h2>Chọn server & tạo phòng</h2>
+          <h2>Quản lý server & tạo phòng</h2>
           <div class="form-row">
-            <label class="field">Chọn server
-              <select name="server_slot_id" required>
-                <option value="">Chọn server còn trống</option>
-                <% servers.forEach((server) => { %>
-                  <option value="<%= server.id %>" <%= server.status !== 'available' ? 'disabled' : '' %>>
-                    <%= server.display_name %> - <%= serverStatusLabels[server.status] || server.status %>
-                  </option>
-                <% }) %>
-              </select>
+            <label class="field">Server đang chọn
+              <input readonly value="<%= serverSlot ? (serverSlot.display_name + ' - ' + (serverStatusLabels[serverSlot.status] || serverSlot.status)) : 'Chưa chọn server' %>">
+              <input type="hidden" name="server_slot_id" value="<%= serverSlot ? serverSlot.id : '' %>">
             </label>
             <label class="field">Mục đích
               <select name="purpose">
@@ -103,13 +102,14 @@
             <label class="field span">Mã phòng <input readonly value="<%= room.room_code %>"></label>
             <label class="field span">Server <input readonly value="<%= serverSlot ? serverSlot.display_name : room.server_name %>"></label>
             <label class="field span">Trạng thái server <input readonly value="<%= serverSlot ? (serverStatusLabels[serverSlot.status] || serverSlot.status) : 'Chưa gắn server' %>"></label>
-            <label class="field span">Link web thí sinh <input readonly value="<%= baseUrl %>/candidate/<%= room.room_code %>"></label>
-            <label class="field span">Chọn server - giao diện thường <input readonly value="<%= baseUrl %>/quick/<%= room.quick_token || room.room_code %>/default"></label>
-            <label class="field span">Chọn server - giao diện Olympia <input readonly value="<%= baseUrl %>/quick/<%= room.quick_token || room.room_code %>/olympia"></label>
-            <label class="field span">Màn hình máy chiếu <input readonly value="<%= baseUrl %>/projector/<%= room.room_code %>"></label>
+            <label class="field span">STUDENT - App thí sinh <input readonly value="Mở app Olympia Client desktop và nhập mã ID thí sinh"></label>
+            <label class="field span">Backend cho STUDENT <input readonly value="<%= baseUrl %>"></label>
+            <label class="field span">MC - Màn hình dẫn chương trình <input readonly value="<%= baseUrl %>/mc/<%= room.room_code %>"></label>
+            <label class="field span">SCOREBOARD - Sân khấu/máy chiếu <input readonly value="<%= baseUrl %>/projector/<%= room.room_code %>"></label>
             <label class="field span">Lớp phủ livestream <input readonly value="<%= baseUrl %>/overlay/<%= room.room_code %>"></label>
-            <label class="field span">Màn hình MC <input readonly value="<%= baseUrl %>/host/<%= room.room_code %>"></label>
-            <label class="field span">Bảng điểm <input readonly value="<%= baseUrl %>/scoreboard/<%= room.room_code %>"></label>
+            <label class="field span">SCOREBOARD - Bảng điểm <input readonly value="<%= baseUrl %>/scoreboard/<%= room.room_code %>"></label>
+            <label class="field span">VIEWER - Khán giả <input readonly value="<%= baseUrl %>/viewer/<%= room.room_code %>"></label>
+            <label class="field span">State Recovery <input readonly value="<%= baseUrl %>/api/rooms/<%= room.id %>/recovery-state"></label>
           </div>
           <form class="form-row" style="margin-top:10px" method="post" action="/rooms/<%= room.id %>/question-set">
             <label class="field span">Bộ đề đang gắn với phòng
@@ -155,6 +155,63 @@
             <% }) %>
           </tbody>
         </table>
+      </section>
+
+      <section class="glass" id="server-contestants" style="margin-top:14px">
+        <div class="server-contestant-head">
+          <div>
+            <h2>Thí sinh của server này</h2>
+            <p>Thêm, sửa, xóa theo đúng phòng đang chạy trên server đã chọn.</p>
+          </div>
+          <span class="pill"><%= serverSlot ? serverSlot.display_name : room.server_name %></span>
+        </div>
+        <form class="form-row compact-form server-contestant-form" method="post" action="/rooms/<%= room.id %>/contestants">
+          <label class="field">Mã ID <input name="login_code" placeholder="VD: 1"></label>
+          <label class="field">Máy số <input name="seat_no" type="number" min="1"></label>
+          <label class="field span">Tên thí sinh <input name="display_name" required placeholder="VIET THAI"></label>
+          <label class="field span">Trường / đội <input name="school"></label>
+          <label class="field">Điểm <input name="score" type="number" value="0"></label>
+          <label class="field">Trạng thái
+            <select name="is_active">
+              <option value="1">Đang thi</option>
+              <option value="0">Khóa</option>
+            </select>
+          </label>
+          <div class="btn-row span">
+            <button class="btn success" type="submit">Tạo tài khoản</button>
+          </div>
+        </form>
+
+        <div class="candidate-account-list server-contestant-list">
+          <% contestants.forEach((candidate) => { %>
+            <details class="candidate-account-row">
+              <summary>
+                <strong>ID: <%= candidate.login_code || candidate.id %></strong>
+                <span><%= candidate.seat_no || '' %>. <%= candidate.display_name %></span>
+              </summary>
+              <form class="form-row compact-form" method="post" action="/contestants/<%= candidate.id %>/update">
+                <label class="field">Mã ID <input name="login_code" value="<%= candidate.login_code || candidate.id %>"></label>
+                <label class="field">Máy số <input name="seat_no" type="number" value="<%= candidate.seat_no || '' %>"></label>
+                <label class="field span">Tên <input name="display_name" value="<%= candidate.display_name %>" required></label>
+                <label class="field span">Trường / đội <input name="school" value="<%= candidate.school || '' %>"></label>
+                <label class="field span">Avatar URL <input name="avatar_url" value="<%= candidate.avatar_url || '' %>"></label>
+                <label class="field">Điểm <input name="score" type="number" value="<%= candidate.score || 0 %>"></label>
+                <label class="field">Trạng thái
+                  <select name="is_active">
+                    <option value="1" <%= candidate.is_active ? 'selected' : '' %>>Đang thi</option>
+                    <option value="0" <%= !candidate.is_active ? 'selected' : '' %>>Khóa</option>
+                  </select>
+                </label>
+                <div class="btn-row span">
+                  <button class="btn primary" type="submit">Lưu</button>
+                </div>
+              </form>
+              <form method="post" action="/contestants/<%= candidate.id %>/delete" onsubmit="return confirm('Xóa tài khoản thí sinh này?')">
+                <button class="btn danger" type="submit">Xóa tài khoản</button>
+              </form>
+            </details>
+          <% }) %>
+        </div>
       </section>
 
       <section class="section-grid" style="margin-top:14px">
@@ -249,6 +306,7 @@
           <label class="field span">Câu hỏi <textarea id="questionText"><%= state.question.text || '' %></textarea></label>
           <label class="field">Đáp án <input id="questionAnswer" value="<%= state.question.answer || '' %>"></label>
           <label class="field">Media URL <input id="questionMedia" value="<%= state.question.mediaUrl || '' %>"></label>
+          <label class="field span">Ghi chú MC / giải thích <textarea id="questionNote"><%= state.question.note || '' %></textarea></label>
         </div>
         <div class="btn-row">
           <button class="btn primary" id="showQuestion" type="button">Hiển thị câu hỏi</button>
@@ -332,59 +390,9 @@
       <div id="candidateCards"></div>
 
       <div class="glass" style="margin-top:12px">
-        <details class="account-admin-details">
-          <summary>
-            <h3>Tài khoản thí sinh</h3>
-            <span>Thêm/sửa khi cần</span>
-          </summary>
-        <form class="form-row compact-form" method="post" action="/rooms/<%= room.id %>/contestants">
-          <label class="field">Mã ID <input name="login_code" placeholder="VD: 1"></label>
-          <label class="field">Máy số <input name="seat_no" type="number" min="1"></label>
-          <label class="field span">Tên thí sinh <input name="display_name" required placeholder="VIET THAI"></label>
-          <label class="field span">Trường / đội <input name="school"></label>
-          <label class="field">Điểm <input name="score" type="number" value="0"></label>
-          <label class="field">Trạng thái
-            <select name="is_active">
-              <option value="1">Đang thi</option>
-              <option value="0">Khóa</option>
-            </select>
-          </label>
-          <div class="btn-row span">
-            <button class="btn success" type="submit">Tạo tài khoản</button>
-          </div>
-        </form>
-
-        <div class="candidate-account-list">
-          <% contestants.forEach((candidate) => { %>
-            <details class="candidate-account-row">
-              <summary>
-                <strong>ID: <%= candidate.login_code || candidate.id %></strong>
-                <span><%= candidate.seat_no || '' %>. <%= candidate.display_name %></span>
-              </summary>
-              <form class="form-row compact-form" method="post" action="/contestants/<%= candidate.id %>/update">
-                <label class="field">Mã ID <input name="login_code" value="<%= candidate.login_code || candidate.id %>"></label>
-                <label class="field">Máy số <input name="seat_no" type="number" value="<%= candidate.seat_no || '' %>"></label>
-                <label class="field span">Tên <input name="display_name" value="<%= candidate.display_name %>" required></label>
-                <label class="field span">Trường / đội <input name="school" value="<%= candidate.school || '' %>"></label>
-                <label class="field span">Avatar URL <input name="avatar_url" value="<%= candidate.avatar_url || '' %>"></label>
-                <label class="field">Điểm <input name="score" type="number" value="<%= candidate.score || 0 %>"></label>
-                <label class="field">Trạng thái
-                  <select name="is_active">
-                    <option value="1" <%= candidate.is_active ? 'selected' : '' %>>Đang thi</option>
-                    <option value="0" <%= !candidate.is_active ? 'selected' : '' %>>Khóa</option>
-                  </select>
-                </label>
-                <div class="btn-row span">
-                  <button class="btn primary" type="submit">Lưu</button>
-                </div>
-              </form>
-              <form method="post" action="/contestants/<%= candidate.id %>/delete" onsubmit="return confirm('Xóa tài khoản thí sinh này?')">
-                <button class="btn danger" type="submit">Xóa tài khoản</button>
-              </form>
-            </details>
-          <% }) %>
-        </div>
-        </details>
+        <h3>Quản lý thí sinh</h3>
+        <p class="tech-note">Tài khoản thí sinh nằm trong khu quản lý server để không chỉnh nhầm server/phòng.</p>
+        <a class="btn primary" href="#server-contestants">Mở quản lý server</a>
       </div>
 
       <div class="glass" style="margin-top:12px">
@@ -413,11 +421,12 @@
 
   <script>
     window.ROOM_CODE = "<%= room.room_code %>";
+    window.SCREEN_ROLE = "CONTROL";
     window.QUESTION_SET_ID = <%= Number(questionSetId || 1) %>;
   </script>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/public/realtime-client.js"></script>
-  <script src="/public/sound-pack.js"></script>
+  <script src="/public/realtime-client.js?v=20260723-roles-ms"></script>
+  <script src="/public/sound-pack.js?v=20260723-roles-ms"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     let durationsCache = "";
@@ -530,7 +539,7 @@
       if (round === "warmup") return soundById("starting.mainTime");
       if (round === "obstacle" && sec === 15) return soundById("obstacle.15");
       if (round === "speed" && [10, 20, 30, 40].includes(sec)) return soundById(`speed.${sec}`);
-      if (round === "finish" && [5, 15, 20].includes(sec)) return soundById(`finish.${sec}`);
+      if (round === "finish" && [5, 15, 20, 30].includes(sec)) return soundById(`finish.${sec}`);
       if (round === "tie_breaker" && sec === 15) return soundById("subquestion.15");
       return null;
     }
@@ -552,6 +561,7 @@
         showQuestion: {
           obstacle: "obstacle.rowQuestion",
           speed: "speed.question",
+          finish: "finish.choiceChosen",
           tie_breaker: "subquestion.question",
         },
         showAnswers: {
@@ -579,6 +589,86 @@
       const soundId = byRound[action]?.[round] || fallbackId;
       if (soundId) playSound(soundId);
     }
+    const autoSoundMemory = {
+      buzzer: "",
+      answers: "",
+      answer: "",
+      warmupTurn: "",
+      summary: "",
+      reveal: "",
+    };
+    let autoSoundPrimed = false;
+    function runAutoSounds(state) {
+      const round = state.round || "setup";
+      const questionKey = state.question?.key || "";
+      const firstContestantId = state.ring?.firstContestantId || "";
+      const buzzerKey = `${round}:${questionKey}:${firstContestantId}:${JSON.stringify(state.ring?.lastStatus || {})}`;
+      const answersKey = `${round}:${questionKey}:${Boolean(state.ui?.showCandidateAnswers)}`;
+      const answerKey = `${round}:${questionKey}:${Boolean(state.question?.answerVisible)}`;
+      const warmupTurnKey = `${round}:${state.warmup?.mode || ""}:${questionKey}:${state.timer?.startedAt || ""}`;
+      const revealKey = JSON.stringify(state.puzzle?.revealed || []);
+      const summaryKey = `${round}:${state.timer?.startedAt || ""}`;
+      if (!autoSoundPrimed) {
+        autoSoundPrimed = true;
+        autoSoundMemory.buzzer = buzzerKey;
+        autoSoundMemory.answers = answersKey;
+        autoSoundMemory.answer = answerKey;
+        autoSoundMemory.warmupTurn = warmupTurnKey;
+        autoSoundMemory.reveal = revealKey;
+        autoSoundMemory.summary = summaryKey;
+        return;
+      }
+      if (!firstContestantId) {
+        autoSoundMemory.buzzer = buzzerKey;
+      } else if (buzzerKey !== autoSoundMemory.buzzer) {
+        autoSoundMemory.buzzer = buzzerKey;
+        if (round === "warmup") playSound("starting.claim");
+        else if (round === "obstacle") playSound("obstacle.grant");
+        else if (round === "finish") playSound("finish.grant");
+        else if (round === "tie_breaker") playSound("subquestion.claim");
+      }
+
+      if (state.ui?.showCandidateAnswers && answersKey !== autoSoundMemory.answers) {
+        autoSoundMemory.answers = answersKey;
+        if (round === "obstacle") playSound("obstacle.answers");
+        else if (round === "speed") playSound("speed.answers");
+      }
+
+      if (state.question?.answerVisible && answerKey !== autoSoundMemory.answer) {
+        autoSoundMemory.answer = answerKey;
+        if (round === "obstacle") {
+          playSound(state.puzzle?.centerSelected ? "obstacle.correctObstacle" : "obstacle.correctRow");
+        } else if (round === "speed") {
+          playSound("speed.correct");
+        }
+      }
+
+      if (round === "warmup" && state.warmup?.mode === "individual" && questionKey && warmupTurnKey !== autoSoundMemory.warmupTurn) {
+        autoSoundMemory.warmupTurn = warmupTurnKey;
+        playSound("starting.startTurn");
+        if (state.timer?.running) {
+          window.setTimeout(() => {
+            const current = OlympiaSocket.getState();
+            if (current.question?.key === questionKey && current.timer?.running) playSound("starting.mainTime");
+          }, 900);
+        }
+      }
+
+      if (round === "obstacle" && revealKey !== autoSoundMemory.reveal) {
+        if (autoSoundMemory.reveal) playSound("obstacle.pictureReveal");
+        autoSoundMemory.reveal = revealKey;
+      }
+
+      if (round === "summary" && summaryKey !== autoSoundMemory.summary) {
+        autoSoundMemory.summary = summaryKey;
+        playSound("summary.points");
+      }
+    }
+    function timerDisplayText(state) {
+      const remainingMs = Number(state.timer?.remainingMs ?? Number(state.timer?.remaining || 0) * 1000);
+      if (state.round === "speed" && Number.isFinite(remainingMs)) return (remainingMs / 1000).toFixed(2);
+      return String(Math.ceil(Math.max(0, remainingMs) / 1000));
+    }
     function renderSoundPack() {
       const panel = $("soundPackPanel");
       if (!panel) return;
@@ -598,7 +688,7 @@
       if ($("adminRoundTitle")) $("adminRoundTitle").textContent = roundTitle(state);
       if ($("adminQuestionPreview")) $("adminQuestionPreview").textContent = state.question?.visible ? (state.question.text || "Đang chờ câu hỏi...") : "Đang chờ câu hỏi...";
       if ($("adminAnswerPreview")) $("adminAnswerPreview").textContent = state.question?.answerVisible && state.question?.answer ? state.question.answer : "Ẩn";
-      if ($("adminTimerOrb")) $("adminTimerOrb").textContent = Number(state.timer?.remaining ?? state.timer?.seconds ?? 0);
+      if ($("adminTimerOrb")) $("adminTimerOrb").textContent = timerDisplayText(state);
       const toggle = $("toggleCandidateAnswers");
       if (toggle) {
         const visible = Boolean(state.ui?.showCandidateAnswers);
@@ -748,6 +838,7 @@
       renderCandidateCards(state);
       renderAnswers(state);
       renderAdminConsole(state);
+      runAutoSounds(state);
     };
     renderSoundPack();
     $("saveRoomUi").onclick = () => OlympiaSocket.patch({
@@ -783,6 +874,7 @@
           key: `${$("roundSelect").value}-${Date.now()}`,
           text: $("questionText").value,
           answer: $("questionAnswer").value,
+          note: $("questionNote").value,
           mediaUrl: $("questionMedia").value,
           visible: true,
           answerVisible: false,
@@ -805,13 +897,11 @@
     $("showRoundUi").addEventListener("click", () => playSoundForRound("startRound"));
     $("showAnswer").onclick = () => {
       OlympiaSocket.patch({ question: { answerVisible: true } });
-      playSoundForRound("correct");
     };
     $("hideAnswer").onclick = () => OlympiaSocket.patch({ question: { answerVisible: false } });
     $("toggleCandidateAnswers").onclick = () => {
       const visible = Boolean(OlympiaSocket.getState().ui?.showCandidateAnswers);
       OlympiaSocket.patch({ ui: { showCandidateAnswers: !visible } });
-      if (!visible) playSoundForRound("showAnswers");
     };
     document.querySelectorAll("[data-seconds]").forEach((button) => button.onclick = () => {
       const seconds = Number(button.dataset.seconds);
@@ -829,7 +919,6 @@
     $("stopTimer").onclick = () => OlympiaSocket.stopTimer();
     $("unlockRing").onclick = () => {
       OlympiaSocket.setRing(false, Number($("ringDelay").value));
-      playSoundForRound("claim");
     };
     $("lockRing").onclick = () => OlympiaSocket.setRing(true, Number($("ringDelay").value));
     $("resetRing").onclick = () => OlympiaSocket.patch({ ring: { locked: true, firstContestantId: null, lastStatus: {} } });
@@ -848,6 +937,7 @@
         ring: { locked: false, firstContestantId: null, lastStatus: {} }
       });
       OlympiaSocket.startTimer();
+      playSound("subquestion.question");
     };
     $("tieLock").onclick = () => OlympiaSocket.patch({ tieBreaker: { armed: false }, ring: { locked: true } });
     $("resetRound").onclick = () => confirm("Reset toàn bộ phần thi hiện tại?") && OlympiaSocket.resetRound($("roundSelect").value);
@@ -879,7 +969,7 @@
       const tileIndex = Number(button.dataset.reveal) - 1;
       revealed[tileIndex] = true;
       OlympiaSocket.patch({ puzzle: { revealed, centerSelected: tileIndex === 4 } });
-      playSound(tileIndex === 4 ? "obstacle.grant" : "obstacle.pictureReveal");
+      playSound("obstacle.pictureReveal");
     });
     $("revealAll").onclick = () => {
       OlympiaSocket.patch({ puzzle: { revealed: [true, true, true, true, true], centerSelected: true } });
@@ -895,8 +985,15 @@
     };
     $("saveSpeedSequence").onclick = async () => {
       const body = new URLSearchParams({ question_set_id: String(window.QUESTION_SET_ID || 1), speed_stt: $("speedStt").value, urls: $("speedUrls").value, durations: durationsCache });
-      await fetch("/api/speed-sequence", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
-      OlympiaSocket.patch({ speed: { preloadRequested: true, imageSequence: $("speedUrls").value.split(/\r?\n|,/).map((v) => v.trim()).filter(Boolean) } });
+      const response = await fetch("/api/speed-sequence", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+      const data = await response.json();
+      OlympiaSocket.patch({
+        speed: {
+          preloadRequested: true,
+          imageSequence: data.rows.map((row) => row.media_url),
+          imageDurations: data.rows.map((row) => Number(row.duration_seconds || 0)).filter((value) => value > 0),
+        }
+      });
       alert("Đã lưu chuỗi ảnh.");
     };
     $("loadWall").onclick = async () => {

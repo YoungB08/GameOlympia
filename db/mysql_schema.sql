@@ -8,6 +8,10 @@ CREATE TABLE IF NOT EXISTS admins (
   id INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(50) NOT NULL UNIQUE,
   password_hash CHAR(64) NOT NULL,
+  display_name VARCHAR(100) NOT NULL DEFAULT '',
+  role ENUM('admin', 'bqt') NOT NULL DEFAULT 'admin',
+  server_slot_id INT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -176,9 +180,9 @@ CREATE TABLE IF NOT EXISTS contestant_events (
     ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO admins (username, password_hash)
-VALUES ('admin', SHA2('admin', 256))
-ON DUPLICATE KEY UPDATE username = VALUES(username);
+INSERT INTO admins (username, password_hash, display_name, role, is_active)
+VALUES ('admin', SHA2('admin', 256), 'Admin tổng quản', 'admin', 1)
+ON DUPLICATE KEY UPDATE role = 'admin', is_active = 1;
 
 INSERT INTO question_sets (id, set_code, name, access_password, visibility, is_active)
 VALUES (1, 'SET-DEFAULT', 'Bộ đề mặc định Game Olympia', 'admin', 'private', 1)

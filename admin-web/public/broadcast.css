@@ -340,6 +340,79 @@ button {
   margin-top: 12px;
 }
 
+.server-contestant-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.server-contestant-head p,
+.tech-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.server-contestant-form {
+  border: 1px solid rgba(125, 211, 252, 0.26);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(2, 6, 23, 0.26);
+}
+
+.server-contestant-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.viewer-shell {
+  min-height: 100vh;
+}
+
+.viewer-content {
+  width: min(1180px, calc(100vw - 40px));
+  margin: 0 auto;
+  padding-top: 32px;
+}
+
+.viewer-stage {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+  margin-top: 18px;
+}
+
+.viewer-timer {
+  display: grid;
+  min-height: 132px;
+  place-items: center;
+  border: 1px solid rgba(125, 211, 252, 0.42);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.5);
+  color: #f8fafc;
+  font-size: 56px;
+  font-weight: 900;
+}
+
+.viewer-question,
+.viewer-answer {
+  min-height: 132px;
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.viewer-answer {
+  margin-top: 12px;
+  color: var(--amber);
+}
+
+.viewer-score-list {
+  margin-top: 24px;
+}
+
 .account-admin-details > summary {
   display: flex;
   gap: 8px;
@@ -787,6 +860,24 @@ button {
 }
 
 @media (max-width: 1100px) {
+  .server-contestant-list {
+    grid-template-columns: 1fr;
+  }
+
+  .server-contestant-head {
+    display: grid;
+  }
+
+  .viewer-stage {
+    grid-template-columns: 1fr;
+  }
+
+  .viewer-content {
+    width: calc(100% - 24px);
+    max-width: 900px;
+    padding-top: 16px;
+  }
+
   .tech-shell {
     grid-template-columns: 1fr;
   }

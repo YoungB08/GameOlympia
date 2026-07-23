@@ -16,6 +16,10 @@
       </div>
     </div>
     <a class="<%= current === 'technician' ? 'active' : '' %>" href="/technician">Bảng kỹ thuật</a>
+    <% if (user && user.role !== 'bqt') { %>
+      <a class="<%= current === 'server-select' ? 'active' : '' %>" href="/server/select?next=/technician">Quản lý server</a>
+      <a class="<%= current === 'bqt-users' ? 'active' : '' %>" href="/admin/bqt-users">Tài khoản BQT</a>
+    <% } %>
     <a class="<%= current === 'dashboard' ? 'active' : '' %>" href="/dashboard">Tổng quan</a>
     <% Object.entries(tables).forEach(([key, table]) => { %>
       <a class="<%= current === key ? 'active' : '' %>" href="/admin/<%= key %>"><%= table.title %></a>
@@ -28,6 +32,10 @@
     <header class="topbar">
       <div>
         <strong><%= user ? user.username : '' %></strong>
+        <span><%= user && user.role === 'bqt' ? 'BQT server' : 'Admin tổng quản' %></span>
+        <% if (typeof selectedServerSlot !== 'undefined' && selectedServerSlot) { %>
+          <span>Server: <%= selectedServerSlot.display_name %></span>
+        <% } %>
         <span>Cơ sở dữ liệu MySQL: <%= process.env.DB_NAME || 'game_olympia' %></span>
       </div>
     </header>

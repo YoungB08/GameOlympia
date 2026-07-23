@@ -8,7 +8,6 @@ from PySide6.QtCore import QSettings, QTimer, Qt
 from PySide6.QtGui import QFont, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
-    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -21,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .audio import MediaPlayback
 from .client_widgets import (
     CLIENT_QSS,
     BuzzerIndicator,
@@ -30,8 +30,8 @@ from .client_widgets import (
     RoundVisualPanel,
     StageBackground,
 )
-from .config import ADMIN_SERVER_URL, APP_HEIGHT, APP_WIDTH, BRAND_LOGO_PATH, CLIENT_ROOM_CODE
-from .realtime_client import RealtimeClient, seconds_remaining
+from .config import ADMIN_SERVER_URL, APP_HEIGHT, APP_WIDTH, BRAND_LOGO_PATH
+from .realtime_client import RealtimeClient, remaining_milliseconds, seconds_remaining
 
 
 def round_label(round_key: str | None) -> str:
@@ -152,8 +152,8 @@ def can_answer(state: dict[str, Any], contestant: dict[str, Any] | None, buzzer:
 
 def timer_percent(state: dict[str, Any]) -> float:
     timer = state.get("timer") or {}
-    total = float(timer.get("seconds") or 0)
-    remaining = float(timer.get("remaining") or 0)
+    total = float(timer.get("durationMs") or float(timer.get("seconds") or 0) * 1000)
+    remaining = float(timer.get("remainingMs") if timer.get("remainingMs") is not None else float(timer.get("remaining") or 0) * 1000)
     if total <= 0:
         return 100.0
     return max(0.0, min(100.0, remaining / total * 100))
@@ -161,10 +161,22 @@ def timer_percent(state: dict[str, Any]) -> float:
 
 def speed_frame_index(state: dict[str, Any]) -> int:
     timer = state.get("timer") or {}
-    total = int(timer.get("seconds") or 0)
-    remaining = int(timer.get("remaining") or total)
+    total = int(timer.get("durationMs") or int(float(timer.get("seconds") or 0) * 1000))
+    remaining = int(timer.get("remainingMs") if timer.get("remainingMs") is not None else total)
     if total > 0:
         elapsed = max(0, total - remaining)
+        durations = [
+            max(0, int(float(value) * 1000))
+            for value in ((state.get("speed") or {}).get("imageDurations") or [])
+            if str(value or "").strip()
+        ]
+        if durations:
+            cursor = 0
+            for index, duration in enumerate(durations):
+                cursor += duration
+                if elapsed < cursor:
+                    return max(0, min(index, 3))
+            return max(0, min(len(durations) - 1, 3))
         return min(3, int(elapsed / max(1, total / 4)))
     return max(0, min(3, int(deep_get(state, "speed.questionIndex", 1) or 1) - 1))
 
@@ -203,6 +215,8 @@ class MainWindow(StageBackground):
         self.contestant: dict[str, Any] | None = None
         self.pending_login_code = ""
         self.mini_mode = False
+        self.media_player = MediaPlayback()
+        self._last_media_token = ""
 
         self.stack = QStackedWidget()
         self.login_page = LoginPage(self)
@@ -225,9 +239,10 @@ class MainWindow(StageBackground):
     def contestant_id(self) -> int:
         return int((self.contestant or {}).get("id") or 0)
 
-    def connect_room(self, server_url: str, room_code: str) -> None:
+    def connect_room(self, server_url: str, room_code: str = "") -> None:
         self.settings.setValue("server_url", server_url)
-        self.settings.setValue("room_code", room_code)
+        if room_code:
+            self.settings.setValue("room_code", room_code)
         self.realtime.connect_to(server_url, room_code)
 
     def login_candidate(self, login_code: str) -> None:
@@ -240,21 +255,46 @@ class MainWindow(StageBackground):
 
     def on_state_initialized(self, state: object) -> None:
         self.state = deepcopy(state if isinstance(state, dict) else {})
-        self.state["timer"] = {**(self.state.get("timer") or {}), "remaining": seconds_remaining(self.state.get("timer"))}
+        self.state["timer"] = {
+            **(self.state.get("timer") or {}),
+            "remaining": seconds_remaining(self.state.get("timer")),
+            "remainingMs": remaining_milliseconds(self.state.get("timer")),
+        }
+        self.sync_media_playback()
         self.login_page.populate_candidates(self.state.get("candidates") or [])
         self.client_page.render(self.state)
-        if self.pending_login_code:
-            self.realtime.login_candidate(self.pending_login_code)
 
     def on_state_patched(self, state: object) -> None:
         self.state = deepcopy(state if isinstance(state, dict) else {})
-        self.state["timer"] = {**(self.state.get("timer") or {}), "remaining": seconds_remaining(self.state.get("timer"))}
+        self.state["timer"] = {
+            **(self.state.get("timer") or {}),
+            "remaining": seconds_remaining(self.state.get("timer")),
+            "remainingMs": remaining_milliseconds(self.state.get("timer")),
+        }
+        self.sync_media_playback()
         self.login_page.populate_candidates(self.state.get("candidates") or [])
         self.client_page.render(self.state)
+
+    def sync_media_playback(self) -> None:
+        media = self.state.get("media") or {}
+        media_url = str(media.get("url") or "")
+        token = f"{media_url}|{media.get('startedAt') or ''}" if media.get("playing") and media_url else ""
+        if not token:
+            if self._last_media_token:
+                self.media_player.stop()
+            self._last_media_token = ""
+            return
+        if token == self._last_media_token:
+            return
+        self._last_media_token = token
+        self.media_player.play_media(media_url, self.realtime.server_url, media.get("volume", 0.5))
 
     def on_login_ok(self, payload: object) -> None:
         data = payload if isinstance(payload, dict) else {}
         self.contestant = data.get("contestant") or {}
+        room = data.get("room") if isinstance(data.get("room"), dict) else {}
+        if room.get("room_code"):
+            self.settings.setValue("room_code", str(room.get("room_code") or ""))
         if self.contestant:
             self.settings.setValue("contestant_id", int(self.contestant.get("id") or 0))
         self.stack.setCurrentWidget(self.client_page)
@@ -265,6 +305,14 @@ class MainWindow(StageBackground):
         self.contestant = None
         self.stack.setCurrentWidget(self.login_page)
         self.login_page.set_status(message or "Mã ID không hợp lệ.", error=True)
+
+    def return_to_login(self) -> None:
+        self.contestant = None
+        self.pending_login_code = ""
+        self.stack.setCurrentWidget(self.login_page)
+        self.login_page.set_status("Nhập mã ID thí sinh do admin cấp.", error=False)
+        self.login_page.code_input.selectAll()
+        self.login_page.code_input.setFocus()
 
     def on_disconnected(self) -> None:
         self.client_page.set_status("Mất kết nối admin server.", error=True)
@@ -315,7 +363,7 @@ class LoginPage(QWidget):
         root.setContentsMargins(22, 18, 22, 18)
         root.setSpacing(16)
         top = QHBoxLayout()
-        self.status_label = QLabel("Nhập mã phòng và mã ID thí sinh do admin cấp.")
+        self.status_label = QLabel("Nhập mã ID thí sinh do admin cấp.")
         self.status_label.setObjectName("statusText")
         top.addWidget(self.status_label, 1)
         top.addWidget(WindowControls(window))
@@ -346,36 +394,21 @@ class LoginPage(QWidget):
 
         self.server_input = QLineEdit()
         self.server_input.setPlaceholderText("Địa chỉ admin server")
-        self.server_input.setText(str(window.settings.value("server_url", ADMIN_SERVER_URL)))
-        self.room_input = QLineEdit()
-        self.room_input.setPlaceholderText("Mã phòng thi, ví dụ ROOM-ABC123")
-        self.room_input.setText(str(window.settings.value("room_code", CLIENT_ROOM_CODE)))
+        saved_server_url = str(window.settings.value("server_url", ADMIN_SERVER_URL) or "").strip() or ADMIN_SERVER_URL
+        self.server_input.setText(saved_server_url)
         self.code_input = QLineEdit()
         self.code_input.setPlaceholderText("Mã ID thí sinh")
         self.code_input.setText(str(window.settings.value("login_code", "")))
         self.code_input.returnPressed.connect(self.connect_and_login)
 
-        self.candidate_combo = QComboBox()
-        self.candidate_combo.addItem("Chọn thí sinh để điền mã ID sau khi kết nối phòng", "")
-        self.candidate_combo.currentIndexChanged.connect(self.fill_candidate_code)
-
-        panel_layout.addWidget(self.caption("Admin server"))
-        panel_layout.addWidget(self.server_input)
-        panel_layout.addWidget(self.caption("Phòng thi"))
-        panel_layout.addWidget(self.room_input)
         panel_layout.addWidget(self.caption("Mã ID thí sinh"))
         panel_layout.addWidget(self.code_input)
-        panel_layout.addWidget(self.candidate_combo)
 
         buttons = QHBoxLayout()
         buttons.setSpacing(12)
-        connect_btn = QPushButton("Kết nối phòng")
-        connect_btn.setObjectName("ghostButton")
-        connect_btn.clicked.connect(self.connect_only)
         login_btn = QPushButton("Vào sảnh thi")
         login_btn.setObjectName("primaryButton")
         login_btn.clicked.connect(self.connect_and_login)
-        buttons.addWidget(connect_btn)
         buttons.addWidget(login_btn)
         panel_layout.addLayout(buttons)
 
@@ -399,9 +432,9 @@ class LoginPage(QWidget):
         return label
 
     def connect_only(self) -> None:
-        self.set_status("Đang kết nối phòng thi...", error=False)
+        self.set_status("Đang kết nối backend...", error=False)
         self.window.pending_login_code = ""
-        self.window.connect_room(self.server_input.text().strip(), self.room_input.text().strip())
+        self.window.connect_room(self.server_input.text().strip(), "")
 
     def connect_and_login(self) -> None:
         code = self.code_input.text().strip()
@@ -414,31 +447,18 @@ class LoginPage(QWidget):
         if self.window.realtime.connected_flag:
             self.window.login_candidate(code)
         else:
-            self.window.connect_room(self.server_input.text().strip(), self.room_input.text().strip())
+            self.window.connect_room(self.server_input.text().strip(), "")
 
     def on_connected(self) -> None:
-        self.set_status("Đã kết nối. Đang tải danh sách thí sinh...", error=False)
+        self.set_status("Đã kết nối backend. Đang tìm server theo mã ID...", error=False)
+        if self.window.pending_login_code:
+            self.window.realtime.login_candidate(self.window.pending_login_code)
 
     def populate_candidates(self, candidates: list[dict[str, Any]]) -> None:
-        if candidates == self._last_candidates:
-            return
         self._last_candidates = deepcopy(candidates)
-        self.candidate_combo.blockSignals(True)
-        self.candidate_combo.clear()
-        self.candidate_combo.addItem("Chọn thí sinh để điền mã ID", "")
-        for candidate in candidates:
-            cid = str(candidate.get("id") or "")
-            seat = candidate.get("seat_no") or ""
-            name = candidate.get("display_name") or "Thí sinh"
-            school = candidate.get("school") or ""
-            self.candidate_combo.addItem(f"{seat}. {name} - {school}", cid)
-        self.candidate_combo.blockSignals(False)
 
     def fill_candidate_code(self) -> None:
-        value = self.candidate_combo.currentData()
-        if value:
-            self.code_input.setText(str(value))
-            self.code_input.setFocus()
+        self.code_input.setFocus()
 
     def set_status(self, message: str, error: bool = False) -> None:
         self.status_label.setText(message)
@@ -461,7 +481,7 @@ class ClientPage(QWidget):
 
         self.timer_tick = QTimer(self)
         self.timer_tick.timeout.connect(self.render_timer_tick)
-        self.timer_tick.start(250)
+        self.timer_tick.start(50)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 14, 18, 12)
@@ -469,8 +489,11 @@ class ClientPage(QWidget):
 
         top = QHBoxLayout()
         left = QVBoxLayout()
-        self.round_badge = QLabel("SẢNH CHỜ")
+        self.round_badge = QPushButton("SẢNH CHỜ")
         self.round_badge.setObjectName("roundBadge")
+        self.round_badge.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.round_badge.setToolTip("Đổi mã thí sinh")
+        self.round_badge.clicked.connect(window.return_to_login)
         self.room_code = QLabel("")
         self.room_code.setObjectName("roomCode")
         left.addWidget(self.round_badge, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -549,6 +572,7 @@ class ClientPage(QWidget):
         self.window.state["timer"] = {
             **(self.window.state.get("timer") or {}),
             "remaining": seconds_remaining(self.window.state.get("timer")),
+            "remainingMs": remaining_milliseconds(self.window.state.get("timer")),
         }
         self.render(self.window.state, from_timer=True)
 
@@ -588,7 +612,7 @@ class ClientPage(QWidget):
 
         status, is_error = self.status_for_state(state, contestant, buzzer, answer_open, buzz_open)
         self.set_status(status, is_error)
-        if answer_open and not from_timer:
+        if answer_open and not from_timer and self.window.stack.currentWidget() is self:
             self.answer_input.setFocus()
 
     def buzz_label_for_round(self, round_key: str | None) -> str:
