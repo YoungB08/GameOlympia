@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quản trị Game Olympia</title>
+  <link rel="stylesheet" href="/public/admin.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand admin-brand">
+      <img src="/assets/logo.png" alt="KNTech" onerror="this.style.display='none'">
+      <div>
+        <strong>Quản trị Olympia</strong>
+        <a href="https://www.facebook.com/it.knz/" target="_blank" rel="noopener">Bản quyền KNTech</a>
+      </div>
+    </div>
+    <a class="<%= current === 'technician' ? 'active' : '' %>" href="/technician">Bảng kỹ thuật</a>
+    <a class="<%= current === 'dashboard' ? 'active' : '' %>" href="/dashboard">Tổng quan</a>
+    <% Object.entries(tables).forEach(([key, table]) => { %>
+      <a class="<%= current === key ? 'active' : '' %>" href="/admin/<%= key %>"><%= table.title %></a>
+    <% }) %>
+    <form method="post" action="/logout" class="logout">
+      <button type="submit">Đăng xuất</button>
+    </form>
+  </aside>
+  <main class="content">
+    <header class="topbar">
+      <div>
+        <strong><%= user ? user.username : '' %></strong>
+        <span>Cơ sở dữ liệu MySQL: <%= process.env.DB_NAME || 'game_olympia' %></span>
+      </div>
+    </header>

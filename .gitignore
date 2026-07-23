@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+admin-web/node_modules/
+admin-web/server.log
+admin-web/server.err
+admin-web/uploads/*
+!admin-web/uploads/.gitkeep

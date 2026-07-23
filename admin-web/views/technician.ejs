@@ -1,0 +1,921 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bảng kỹ thuật - <%= room.room_code %></title>
+  <link rel="stylesheet" href="/public/broadcast.css">
+</head>
+<body class="broadcast">
+  <div class="tech-shell">
+    <aside class="tech-sidebar">
+      <div class="tech-brand tech-brand-card">
+        <img src="/assets/logo.png" alt="KNTech" onerror="this.style.display='none'">
+        <div>
+          <strong>Bảng kỹ thuật Olympia</strong>
+          <a href="https://www.facebook.com/it.knz/" target="_blank" rel="noopener">Bản quyền KNTech</a>
+        </div>
+      </div>
+      <%
+        const navTabs = [
+          { label: 'Chọn server', section: 'server-booking' },
+          { label: 'Cài đặt phòng', section: 'room-setup' },
+          { label: 'Khởi động', section: 'round-control', round: 'warmup', seconds: 5 },
+          { label: 'Vượt chướng ngại vật', section: 'round-tools', round: 'obstacle', seconds: 15 },
+          { label: 'Tăng tốc', section: 'round-tools', round: 'speed', seconds: 20 },
+          { label: 'Về đích', section: 'round-control', round: 'finish', seconds: 30 },
+          { label: 'Câu hỏi phụ', section: 'round-tools', round: 'tie_breaker', seconds: 15 },
+          { label: 'Jeopardy', section: 'round-tools', round: 'jeopardy', seconds: 15 },
+          { label: 'Tường liên kết', section: 'round-tools', round: 'connecting_wall', seconds: 150 },
+          { label: 'Tổng kết', section: 'answers-panel', round: 'summary' },
+        ];
+        const serverStatusLabels = { available: 'Trống', booked: 'Đã đặt', maintenance: 'Bảo trì' };
+      %>
+      <% navTabs.forEach((tab, index) => { %>
+        <button
+          type="button"
+          class="nav-tab <%= index === 0 ? 'active' : '' %>"
+          data-section="<%= tab.section %>"
+          <% if (tab.round) { %> data-round="<%= tab.round %>" <% } %>
+          <% if (tab.seconds) { %> data-seconds-preset="<%= tab.seconds %>" <% } %>
+        ><%= tab.label %></button>
+      <% }) %>
+      <div class="btn-row">
+        <a class="btn" href="/dashboard">Quản trị dữ liệu</a>
+        <a class="btn" href="/admin/export.json">Xuất JSON</a>
+        <a class="btn" href="/admin/export.xlsx">Xuất Excel</a>
+      </div>
+    </aside>
+
+    <main class="tech-main">
+      <section class="section-grid" id="server-booking" data-section="server-booking">
+        <form class="glass" method="post" action="/rooms/book">
+          <h2>Chọn server & tạo phòng</h2>
+          <div class="form-row">
+            <label class="field">Chọn server
+              <select name="server_slot_id" required>
+                <option value="">Chọn server còn trống</option>
+                <% servers.forEach((server) => { %>
+                  <option value="<%= server.id %>" <%= server.status !== 'available' ? 'disabled' : '' %>>
+                    <%= server.display_name %> - <%= serverStatusLabels[server.status] || server.status %>
+                  </option>
+                <% }) %>
+              </select>
+            </label>
+            <label class="field">Mục đích
+              <select name="purpose">
+                <option>Giải đấu</option>
+                <option>Đấu tập</option>
+                <option>Test</option>
+              </select>
+            </label>
+            <label class="field">Bộ đề sử dụng
+              <select name="question_set_id">
+                <% questionSets.forEach((set) => { %>
+                  <option value="<%= set.id %>" <%= Number(set.id) === Number(questionSetId) ? 'selected' : '' %>>
+                    <%= set.set_code || ('SET-' + set.id) %> - <%= set.name %>
+                  </option>
+                <% }) %>
+              </select>
+            </label>
+            <label class="field">Bắt đầu
+              <input id="scheduledFrom" type="datetime-local" name="scheduled_from" required>
+            </label>
+            <label class="field">Kết thúc
+              <input id="scheduledTo" type="datetime-local" name="scheduled_to" required>
+            </label>
+            <label class="field">Mật khẩu cấp 1
+              <input name="login_password" value="admin">
+            </label>
+            <label class="field">Mật khẩu cấp 2
+              <input name="recovery_password" value="admin">
+            </label>
+            <label class="field span">
+              <span><input id="bookNow" type="checkbox" name="now" value="1"> Now</span>
+            </label>
+          </div>
+          <div class="btn-row"><button class="btn primary" type="submit">Tạo phòng trên server đã chọn</button></div>
+        </form>
+
+        <div class="glass">
+          <h2>Server đang điều khiển</h2>
+          <div class="form-row">
+            <label class="field span">Mã phòng <input readonly value="<%= room.room_code %>"></label>
+            <label class="field span">Server <input readonly value="<%= serverSlot ? serverSlot.display_name : room.server_name %>"></label>
+            <label class="field span">Trạng thái server <input readonly value="<%= serverSlot ? (serverStatusLabels[serverSlot.status] || serverSlot.status) : 'Chưa gắn server' %>"></label>
+            <label class="field span">Link web thí sinh <input readonly value="<%= baseUrl %>/candidate/<%= room.room_code %>"></label>
+            <label class="field span">Chọn server - giao diện thường <input readonly value="<%= baseUrl %>/quick/<%= room.quick_token || room.room_code %>/default"></label>
+            <label class="field span">Chọn server - giao diện Olympia <input readonly value="<%= baseUrl %>/quick/<%= room.quick_token || room.room_code %>/olympia"></label>
+            <label class="field span">Màn hình máy chiếu <input readonly value="<%= baseUrl %>/projector/<%= room.room_code %>"></label>
+            <label class="field span">Lớp phủ livestream <input readonly value="<%= baseUrl %>/overlay/<%= room.room_code %>"></label>
+            <label class="field span">Màn hình MC <input readonly value="<%= baseUrl %>/host/<%= room.room_code %>"></label>
+            <label class="field span">Bảng điểm <input readonly value="<%= baseUrl %>/scoreboard/<%= room.room_code %>"></label>
+          </div>
+          <form class="form-row" style="margin-top:10px" method="post" action="/rooms/<%= room.id %>/question-set">
+            <label class="field span">Bộ đề đang gắn với phòng
+              <select name="question_set_id">
+                <% questionSets.forEach((set) => { %>
+                  <option value="<%= set.id %>" <%= Number(set.id) === Number(questionSetId) ? 'selected' : '' %>>
+                    <%= set.set_code || ('SET-' + set.id) %> - <%= set.name %>
+                  </option>
+                <% }) %>
+              </select>
+            </label>
+            <div class="btn-row span">
+              <button class="btn primary" type="submit">Áp dụng bộ đề cho phòng</button>
+            </div>
+          </form>
+          <div class="btn-row">
+            <form method="post" action="/rooms/<%= room.id %>/status"><input type="hidden" name="status" value="live"><button class="btn success" type="submit">Bắt đầu thi</button></form>
+            <form method="post" action="/rooms/<%= room.id %>/status"><input type="hidden" name="status" value="paused"><button class="btn warning" type="submit">Tạm dừng</button></form>
+            <form method="post" action="/rooms/<%= room.id %>/status"><input type="hidden" name="status" value="finished"><button class="btn danger" type="submit">Kết thúc</button></form>
+          </div>
+        </div>
+      </section>
+
+      <section class="glass" style="margin-top:14px">
+        <h2>Phòng trên server này</h2>
+        <table class="answers-table">
+          <thead><tr><th>Máy chủ</th><th>Phòng</th><th>Bộ đề</th><th>Mục đích</th><th>Trạng thái</th><th>Thời gian</th><th></th></tr></thead>
+          <tbody>
+            <% rooms.forEach((r) => { %>
+              <tr>
+                <td><%= r.server_name %></td>
+                <td><a href="/technician/<%= r.room_code %>"><%= r.room_code %></a></td>
+                <td><%= r.question_set_code || ('SET-' + (r.question_set_id || 1)) %></td>
+                <td><%= r.purpose %></td>
+                <td><%= r.status %></td>
+                <td><%= r.scheduled_from ? new Date(r.scheduled_from).toLocaleString('vi-VN') : '' %></td>
+                <td>
+                  <form method="post" action="/rooms/<%= r.id %>/unbook" onsubmit="return confirm('Hủy đăng ký phòng này?')">
+                    <button class="btn danger" type="submit">Hủy đăng ký</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section-grid" style="margin-top:14px">
+        <div class="glass" id="room-setup" data-section="room-setup">
+          <h2>Cài đặt phòng & UI</h2>
+          <div class="form-row">
+            <label class="field">Tên cuộc thi <input id="contestTitle" value="<%= state.contestTitle %>"></label>
+            <label class="field">Số thí sinh
+              <select id="candidateCount">
+                <% for (let i = 2; i <= 8; i += 1) { %>
+                  <option value="<%= i %>" <%= state.scoring.candidateCount === i ? 'selected' : '' %>><%= i %></option>
+                <% } %>
+              </select>
+            </label>
+            <label class="field">Bảng điểm
+              <select id="scoreboardMode">
+                <option value="names">Tên</option>
+                <option value="scores">Điểm</option>
+                <option value="both" selected>Tên + điểm</option>
+              </select>
+            </label>
+            <label class="field">Chế độ máy chiếu
+              <select id="projectorMode">
+                <option value="projector">Máy chiếu</option>
+                <option value="overlay">Lớp phủ OBS</option>
+                <option value="clean">Tối giản</option>
+              </select>
+            </label>
+            <label class="field">Bộ luật
+              <select id="rulePreset">
+                <option value="olympia26">Olympia 26 (Mới nhất)</option>
+                <option value="olympia24">Olympia 24 / Tùy chỉnh</option>
+              </select>
+            </label>
+            <label class="field span"><span><input id="showLogo" type="checkbox" checked> Hiển thị logo</span></label>
+            <label class="field span"><span><input id="allowNegative" type="checkbox" checked> Cho phép điểm âm</span></label>
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="saveRoomUi" type="button">Lưu cài đặt</button>
+            <button class="btn warning" id="showRoundUi" type="button">Hiển thị giao diện phần thi</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="glass" id="round-control" data-section="round-control" style="margin-top:14px">
+        <h2>Bảng điều khiển câu hỏi</h2>
+        <div class="admin-classic-console">
+          <div class="admin-console-main">
+            <div class="admin-console-title">Phần thi: <span id="adminRoundTitle">Sảnh chờ</span></div>
+            <div class="admin-console-line"><strong>Câu hỏi:</strong><span id="adminQuestionPreview">Đang chờ câu hỏi...</span></div>
+            <div class="admin-console-line"><strong>Đáp án:</strong><span id="adminAnswerPreview">Ẩn</span></div>
+            <div class="admin-answer-preview" id="adminStudentAnswerPreview"></div>
+          </div>
+          <aside class="admin-console-side">
+            <div class="timer-orb admin-timer-orb" id="adminTimerOrb">0</div>
+            <button class="btn primary" id="toggleCandidateAnswers" type="button">Hiện câu trả lời thí sinh</button>
+          </aside>
+        </div>
+        <div class="form-row">
+          <label class="field">Phần thi
+            <select id="roundSelect">
+              <option value="warmup">Khởi động</option>
+              <option value="obstacle">VCNV</option>
+              <option value="speed">Tăng tốc</option>
+              <option value="finish">Về đích</option>
+              <option value="tie_breaker">Câu hỏi phụ</option>
+              <option value="jeopardy">MVT Jeopardy</option>
+              <option value="connecting_wall">Only Connect</option>
+              <option value="summary">Tổng kết</option>
+            </select>
+          </label>
+          <label class="field">Đồng hồ (giây) <input id="timerSeconds" type="number" value="15"></label>
+          <label class="field">Chế độ Khởi động
+            <select id="warmupMode">
+              <option value="individual">Lượt cá nhân - 6 câu</option>
+              <option value="common">Lượt chung - 12 câu chuông</option>
+            </select>
+          </label>
+          <label class="field">Thí sinh lượt chính
+            <select id="activeContestant">
+              <option value="">Chưa chọn</option>
+            </select>
+          </label>
+          <label class="field">Câu Tăng tốc O26
+            <select id="speedQuestionIndex">
+              <option value="1">Câu 1 - 20s</option>
+              <option value="2">Câu 2 - 20s</option>
+              <option value="3">Câu 3 - 30s</option>
+              <option value="4">Câu 4 - 30s</option>
+            </select>
+          </label>
+          <label class="field span">Câu hỏi <textarea id="questionText"><%= state.question.text || '' %></textarea></label>
+          <label class="field">Đáp án <input id="questionAnswer" value="<%= state.question.answer || '' %>"></label>
+          <label class="field">Media URL <input id="questionMedia" value="<%= state.question.mediaUrl || '' %>"></label>
+        </div>
+        <div class="btn-row">
+          <button class="btn primary" id="showQuestion" type="button">Hiển thị câu hỏi</button>
+          <button class="btn" id="hideAnswer" type="button">Ẩn đáp án</button>
+          <button class="btn success" id="showAnswer" type="button">Hiện đáp án</button>
+          <button class="btn warning" data-seconds="3" type="button">Đếm 3s</button>
+          <button class="btn warning" data-seconds="5" type="button">Đếm 5s</button>
+          <button class="btn warning" data-seconds="10" type="button">10s</button>
+          <button class="btn warning" data-seconds="15" type="button">15s</button>
+          <button class="btn warning" data-seconds="20" type="button">20s</button>
+          <button class="btn warning" data-seconds="30" type="button">30s</button>
+          <button class="btn primary" id="autoTimer" type="button">Đồng hồ theo bộ luật</button>
+          <button class="btn primary" id="nextWarmup" type="button">Câu KĐ tiếp theo</button>
+          <button class="btn danger" id="stopTimer" type="button">Dừng giờ</button>
+        </div>
+      </section>
+
+      <section class="section-grid" id="round-tools" data-section="round-tools" style="margin-top:14px">
+        <div class="glass">
+          <h2>Điều khiển chuông & luật</h2>
+          <div class="form-row">
+            <label class="field">Độ trễ chuông 0-5 giây <input id="ringDelay" type="number" min="0" max="5" step="0.25" value="<%= state.ring.delaySeconds %>"></label>
+            <label class="field">Gói Về Đích <select id="finishPackage"><option>20</option><option>40</option></select></label>
+            <label class="field span"><span><input id="finishStealMode" type="checkbox"> Lượt cướp điểm: chỉ ghi nhận đáp án đầu tiên</span></label>
+          </div>
+          <div class="btn-row">
+            <button class="btn success" id="unlockRing" type="button">Mở chuông khẩn cấp</button>
+            <button class="btn danger" id="lockRing" type="button">Khóa chuông</button>
+            <button class="btn" id="resetRing" type="button">Đặt lại chuông</button>
+            <button class="btn warning" id="starYes" type="button">Xác nhận chọn sao</button>
+            <button class="btn" id="starNo" type="button">Không chọn sao</button>
+            <button class="btn success" id="tieStart" type="button">Bắt đầu Câu hỏi phụ</button>
+            <button class="btn danger" id="tieLock" type="button">Khóa Câu hỏi phụ</button>
+            <button class="btn danger" id="resetRound" type="button">Đặt lại toàn bộ phần thi</button>
+          </div>
+        </div>
+
+        <div class="glass">
+          <h2>VCNV / Tăng tốc / Media</h2>
+          <div class="btn-row">
+            <% [1,2,3,4,5].forEach((tile) => { %>
+              <button class="btn" data-reveal="<%= tile %>" type="button">Lật mảnh <%= tile %></button>
+            <% }) %>
+            <button class="btn success" id="revealAll" type="button">Lật toàn bộ</button>
+            <button class="btn primary" id="preloadSpeed" type="button">Tải trước ảnh</button>
+            <button class="btn" id="showFirstImage" type="button">Hiện trước ảnh 1</button>
+          </div>
+          <div class="form-row" style="margin-top:10px">
+            <label class="field">Câu Tăng tốc
+              <select id="speedStt">
+                <% speedQuestions.forEach((q) => { %><option value="<%= q.stt %>"><%= q.stt %> - <%= q.question %></option><% }) %>
+              </select>
+            </label>
+            <label class="field">Tổng giây tự chia <input id="autoSplitSeconds" type="number" value="30"></label>
+            <label class="field span">Dán URL ảnh/video từ Clipboard<textarea id="speedUrls" placeholder="Mỗi dòng 1 URL"></textarea></label>
+            <label class="field">Only Connect Wall
+              <select id="wallId">
+                <% walls.forEach((wall) => { %><option value="<%= wall.id %>"><%= wall.id %> - <%= wall.title %></option><% }) %>
+              </select>
+            </label>
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="splitDurations" type="button">Chia thời gian tự động</button>
+            <button class="btn success" id="saveSpeedSequence" type="button">Lưu chuỗi ảnh</button>
+            <button class="btn primary" id="loadWall" type="button">Tải Tường liên kết</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="glass" id="answers-panel" data-section="answers-panel" style="margin-top:14px">
+        <h2>Bảng câu trả lời thí sinh</h2>
+        <table class="answers-table">
+          <thead><tr><th>Thí sinh</th><th>Đáp án</th><th>ms</th><th>Chấm</th></tr></thead>
+          <tbody id="answersBody"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <aside class="tech-right">
+      <h2>Thí sinh & chuông</h2>
+      <div id="candidateCards"></div>
+
+      <div class="glass" style="margin-top:12px">
+        <details class="account-admin-details">
+          <summary>
+            <h3>Tài khoản thí sinh</h3>
+            <span>Thêm/sửa khi cần</span>
+          </summary>
+        <form class="form-row compact-form" method="post" action="/rooms/<%= room.id %>/contestants">
+          <label class="field">Mã ID <input name="login_code" placeholder="VD: 1"></label>
+          <label class="field">Máy số <input name="seat_no" type="number" min="1"></label>
+          <label class="field span">Tên thí sinh <input name="display_name" required placeholder="VIET THAI"></label>
+          <label class="field span">Trường / đội <input name="school"></label>
+          <label class="field">Điểm <input name="score" type="number" value="0"></label>
+          <label class="field">Trạng thái
+            <select name="is_active">
+              <option value="1">Đang thi</option>
+              <option value="0">Khóa</option>
+            </select>
+          </label>
+          <div class="btn-row span">
+            <button class="btn success" type="submit">Tạo tài khoản</button>
+          </div>
+        </form>
+
+        <div class="candidate-account-list">
+          <% contestants.forEach((candidate) => { %>
+            <details class="candidate-account-row">
+              <summary>
+                <strong>ID: <%= candidate.login_code || candidate.id %></strong>
+                <span><%= candidate.seat_no || '' %>. <%= candidate.display_name %></span>
+              </summary>
+              <form class="form-row compact-form" method="post" action="/contestants/<%= candidate.id %>/update">
+                <label class="field">Mã ID <input name="login_code" value="<%= candidate.login_code || candidate.id %>"></label>
+                <label class="field">Máy số <input name="seat_no" type="number" value="<%= candidate.seat_no || '' %>"></label>
+                <label class="field span">Tên <input name="display_name" value="<%= candidate.display_name %>" required></label>
+                <label class="field span">Trường / đội <input name="school" value="<%= candidate.school || '' %>"></label>
+                <label class="field span">Avatar URL <input name="avatar_url" value="<%= candidate.avatar_url || '' %>"></label>
+                <label class="field">Điểm <input name="score" type="number" value="<%= candidate.score || 0 %>"></label>
+                <label class="field">Trạng thái
+                  <select name="is_active">
+                    <option value="1" <%= candidate.is_active ? 'selected' : '' %>>Đang thi</option>
+                    <option value="0" <%= !candidate.is_active ? 'selected' : '' %>>Khóa</option>
+                  </select>
+                </label>
+                <div class="btn-row span">
+                  <button class="btn primary" type="submit">Lưu</button>
+                </div>
+              </form>
+              <form method="post" action="/contestants/<%= candidate.id %>/delete" onsubmit="return confirm('Xóa tài khoản thí sinh này?')">
+                <button class="btn danger" type="submit">Xóa tài khoản</button>
+              </form>
+            </details>
+          <% }) %>
+        </div>
+        </details>
+      </div>
+
+      <div class="glass" style="margin-top:12px">
+        <h3>Âm thanh chương trình</h3>
+        <div class="sound-pack-list" id="soundPackPanel"></div>
+        <h3 style="margin-top:14px">Media ngoài</h3>
+        <label class="field">URL media ngoài <input id="mediaUrl"></label>
+        <div class="btn-row">
+          <button class="btn primary" id="playMedia" type="button">Phát</button>
+          <button class="btn danger" id="stopMedia" type="button">Dừng tất cả</button>
+        </div>
+      </div>
+
+      <div class="glass" style="margin-top:12px">
+        <h3>Gửi thông báo cho MC</h3>
+        <label class="field"><textarea id="mcNotice" placeholder="Thông báo cho MC"></textarea></label>
+        <button class="btn warning" id="sendNotice" type="button">Gửi nhấp nháy</button>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="tech-copyright">
+    © <%= new Date().getFullYear() %> Bản quyền thuộc về
+    <a href="https://www.facebook.com/it.knz/" target="_blank" rel="noopener">KNTech</a>
+  </footer>
+
+  <script>
+    window.ROOM_CODE = "<%= room.room_code %>";
+    window.QUESTION_SET_ID = <%= Number(questionSetId || 1) %>;
+  </script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/public/realtime-client.js"></script>
+  <script src="/public/sound-pack.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let durationsCache = "";
+    let contestantOptionsSignature = "";
+    let candidateCardsSignature = "";
+    let answersSignature = "";
+    function toDateTimeLocalInput(date) {
+      const pad = (value) => String(value).padStart(2, "0");
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+    function fillBookingDateTimes(forceNow = false) {
+      const fromInput = $("scheduledFrom");
+      const toInput = $("scheduledTo");
+      if (!fromInput || !toInput) return;
+      const now = new Date();
+      now.setSeconds(0, 0);
+      const fromDate = forceNow || !fromInput.value ? now : new Date(fromInput.value);
+      const safeFrom = Number.isNaN(fromDate.getTime()) ? now : fromDate;
+      const currentTo = toInput.value ? new Date(toInput.value) : null;
+      const fallbackTo = new Date(safeFrom.getTime() + 2 * 60 * 60 * 1000);
+      if (forceNow || !fromInput.value) fromInput.value = toDateTimeLocalInput(safeFrom);
+      if (forceNow || !currentTo || Number.isNaN(currentTo.getTime()) || currentTo <= safeFrom) {
+        toInput.value = toDateTimeLocalInput(fallbackTo);
+      }
+    }
+    fillBookingDateTimes();
+    $("bookNow")?.addEventListener("change", (event) => fillBookingDateTimes(event.target.checked));
+    $("scheduledFrom")?.addEventListener("change", () => fillBookingDateTimes(false));
+    const ROUND_PRESET_LABELS = {
+      warmup: "Khởi động",
+      obstacle: "Vượt chướng ngại vật",
+      speed: "Tăng tốc",
+      finish: "Về đích",
+      tie_breaker: "Câu hỏi phụ",
+      jeopardy: "Jeopardy",
+      connecting_wall: "Tường liên kết",
+      summary: "Tổng kết",
+    };
+    function setActiveNav(button) {
+      document.querySelectorAll(".nav-tab").forEach((tab) => {
+        tab.classList.toggle("active", tab === button);
+      });
+    }
+    function openTechSection(button, shouldScroll = true) {
+      if (!button) return;
+      const round = button.dataset.round;
+      if (round && $("roundSelect")) {
+        $("roundSelect").value = round;
+        if ($("timerSeconds") && button.dataset.secondsPreset) {
+          $("timerSeconds").value = button.dataset.secondsPreset;
+        }
+        if (round === "warmup" && $("warmupMode")) $("warmupMode").value = "individual";
+        if (round === "speed" && $("speedQuestionIndex")) {
+          const current = Number($("speedQuestionIndex").value || 1);
+          $("timerSeconds").value = current <= 2 ? 20 : 30;
+        }
+      }
+      const sectionId = button.dataset.section;
+      const target = sectionId ? document.getElementById(sectionId) : null;
+      if (target && shouldScroll) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      setActiveNav(button);
+      if (round && $("mcNotice")) {
+        $("mcNotice").placeholder = `Ghi chú kỹ thuật cho ${ROUND_PRESET_LABELS[round] || round}`;
+      }
+    }
+    document.querySelectorAll(".nav-tab").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        openTechSection(button);
+      });
+    });
+    function candidateName(id, state) {
+      return (state.candidates || []).find((c) => Number(c.id) === Number(id))?.display_name || "-";
+    }
+    function setControlValue(id, value) {
+      const element = $(id);
+      if (!element || document.activeElement === element || value === undefined || value === null) return;
+      if (element.type === "checkbox") element.checked = Boolean(value);
+      else element.value = String(value);
+    }
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      }[char]));
+    }
+    function roundTitle(state) {
+      return ROUND_PRESET_LABELS[state.round || "setup"] || "Sảnh chờ";
+    }
+    function sortedCurrentAnswers(state) {
+      const key = state.question?.key || "";
+      return [...(state.answers || [])]
+        .filter((answer) => !key || !answer.question_key || answer.question_key === key)
+        .sort((a, b) => Number(a.elapsed_ms ?? 999999999) - Number(b.elapsed_ms ?? 999999999));
+    }
+    function soundById(soundId) {
+      for (const group of window.OLYMPIA_SOUND_GROUPS || []) {
+        const sound = group.sounds.find((item) => item[0] === soundId);
+        if (sound) return { group, sound };
+      }
+      return null;
+    }
+    function soundForTimer(round, seconds) {
+      const sec = Number(seconds || 0);
+      if (round === "warmup") return soundById("starting.mainTime");
+      if (round === "obstacle" && sec === 15) return soundById("obstacle.15");
+      if (round === "speed" && [10, 20, 30, 40].includes(sec)) return soundById(`speed.${sec}`);
+      if (round === "finish" && [5, 15, 20].includes(sec)) return soundById(`finish.${sec}`);
+      if (round === "tie_breaker" && sec === 15) return soundById("subquestion.15");
+      return null;
+    }
+    function playSound(soundId) {
+      const found = soundById(soundId);
+      if (!found) return;
+      OlympiaSocket.playMedia(found.sound[2], found.sound[1]);
+    }
+    function playSoundForRound(action, fallbackId = "") {
+      const round = $("roundSelect")?.value || OlympiaSocket.getState().round;
+      const byRound = {
+        startRound: {
+          warmup: "starting.startRound",
+          obstacle: "obstacle.startRound",
+          speed: "speed.startRound",
+          finish: "finish.startRound",
+          summary: "summary.points",
+        },
+        showQuestion: {
+          obstacle: "obstacle.rowQuestion",
+          speed: "speed.question",
+          tie_breaker: "subquestion.question",
+        },
+        showAnswers: {
+          obstacle: "obstacle.answers",
+          speed: "speed.answers",
+        },
+        correct: {
+          warmup: "starting.correct",
+          obstacle: "obstacle.correctRow",
+          speed: "speed.correct",
+          finish: "finish.correct",
+        },
+        wrong: {
+          warmup: "starting.wrong",
+          obstacle: "obstacle.wrongRow",
+          finish: "finish.wrong",
+        },
+        claim: {
+          warmup: "starting.claim",
+          obstacle: "obstacle.grant",
+          finish: "finish.grant",
+          tie_breaker: "subquestion.claim",
+        },
+      };
+      const soundId = byRound[action]?.[round] || fallbackId;
+      if (soundId) playSound(soundId);
+    }
+    function renderSoundPack() {
+      const panel = $("soundPackPanel");
+      if (!panel) return;
+      panel.innerHTML = (window.OLYMPIA_SOUND_GROUPS || []).map((group) => `
+        <details class="sound-group" ${group.key === "starting" ? "open" : ""}>
+          <summary>${escapeHtml(group.title)}</summary>
+          <div class="sound-buttons">
+            ${group.sounds.map((sound) => `<button class="btn" type="button" data-sound-id="${escapeHtml(sound[0])}">${escapeHtml(sound[1])}</button>`).join("")}
+          </div>
+        </details>
+      `).join("");
+      panel.querySelectorAll("[data-sound-id]").forEach((button) => {
+        button.addEventListener("click", () => playSound(button.dataset.soundId));
+      });
+    }
+    function renderAdminConsole(state) {
+      if ($("adminRoundTitle")) $("adminRoundTitle").textContent = roundTitle(state);
+      if ($("adminQuestionPreview")) $("adminQuestionPreview").textContent = state.question?.visible ? (state.question.text || "Đang chờ câu hỏi...") : "Đang chờ câu hỏi...";
+      if ($("adminAnswerPreview")) $("adminAnswerPreview").textContent = state.question?.answerVisible && state.question?.answer ? state.question.answer : "Ẩn";
+      if ($("adminTimerOrb")) $("adminTimerOrb").textContent = Number(state.timer?.remaining ?? state.timer?.seconds ?? 0);
+      const toggle = $("toggleCandidateAnswers");
+      if (toggle) {
+        const visible = Boolean(state.ui?.showCandidateAnswers);
+        toggle.textContent = visible ? "Ẩn câu trả lời thí sinh" : "Hiện câu trả lời thí sinh";
+        toggle.classList.toggle("success", visible);
+        toggle.classList.toggle("primary", !visible);
+      }
+      const preview = $("adminStudentAnswerPreview");
+      if (!preview) return;
+      const rows = sortedCurrentAnswers(state);
+      preview.innerHTML = rows.length ? rows.map((answer, index) => `
+        <div class="answer-rank-card">
+          <span>${index + 1}</span>
+          <strong>${escapeHtml(candidateName(answer.contestant_id, state))}</strong>
+          <em>${escapeHtml(answer.answer_text)}</em>
+          <b>${answer.elapsed_ms == null ? "" : (Number(answer.elapsed_ms) / 1000).toFixed(2) + "s"}</b>
+        </div>
+      `).join("") : `<div class="answer-rank-empty">Chưa có câu trả lời thí sinh</div>`;
+    }
+    function fillContestantOptions(state) {
+      const select = $("activeContestant");
+      if (!select) return;
+      const selected = select.value || String(state.finish?.activeContestantId || state.warmup?.activeContestantId || "");
+      const signature = (state.candidates || []).map((c) => `${c.id}:${c.seat_no || ""}:${c.display_name || ""}`).join("|");
+      if (signature !== contestantOptionsSignature) {
+        select.innerHTML = '<option value="">Chưa chọn</option>' + (state.candidates || []).map((c) => (
+          `<option value="${Number(c.id)}">${escapeHtml(c.seat_no || "")}. ${escapeHtml(c.display_name || "")}</option>`
+        )).join("");
+        contestantOptionsSignature = signature;
+      }
+      if (document.activeElement !== select) select.value = selected;
+    }
+    function defaultGradePoints(state, answer, isCorrect) {
+      const rules = state.rules || {};
+      if (state.round === "warmup") {
+        return isCorrect ? (rules.warmup?.correctPoints ?? 10) : (state.warmup?.mode === "common" ? (rules.warmup?.commonWrongPenalty ?? -5) : 0);
+      }
+      if (state.round === "obstacle") {
+        return isCorrect ? (state.puzzle?.centerSelected ? (rules.obstacle?.centerCorrectPoints ?? 20) : (rules.obstacle?.rowCorrectPoints ?? 10)) : 0;
+      }
+      if (state.round === "speed") {
+        return isCorrect ? Number(answer.awarded_points ?? 0) : 0;
+      }
+      if (state.round === "finish") {
+        const point = Number(state.question?.point || state.finish?.activePackagePoints || 20);
+        return isCorrect ? (state.question?.starEnabled ? point * (rules.finish?.starCorrectMultiplier ?? 2) : point) : -point;
+      }
+      return isCorrect ? 10 : 0;
+    }
+    function gradeAnswer(answerId, contestantId, isCorrect) {
+      const state = OlympiaSocket.getState();
+      const answer = (state.answers || []).find((item) => Number(item.id) === Number(answerId)) || {};
+      const suggested = defaultGradePoints(state, answer, isCorrect);
+      const label = isCorrect ? "Cộng điểm" : "Trừ điểm";
+      const points = Number(prompt(label, String(suggested)) || 0);
+      OlympiaSocket.grade(answerId, contestantId, isCorrect, points);
+      playSoundForRound(isCorrect ? "correct" : "wrong");
+    }
+    function renderCandidateCards(state) {
+      const cards = $("candidateCards");
+      if (!cards) return;
+      const visibleCandidates = (state.candidates || []).slice(0, state.scoring?.candidateCount || 4);
+      const signature = JSON.stringify({
+        candidates: visibleCandidates.map((c) => ({
+          id: c.id,
+          seat_no: c.seat_no,
+          display_name: c.display_name,
+          school: c.school,
+          avatar_url: c.avatar_url,
+          score: c.score,
+          is_active: c.is_active,
+        })),
+        locked: state.ring?.locked,
+        firstContestantId: state.ring?.firstContestantId,
+        lastStatus: state.ring?.lastStatus || {},
+      });
+      if (signature === candidateCardsSignature) return;
+      candidateCardsSignature = signature;
+      cards.innerHTML = visibleCandidates.map((c) => {
+        const isActive = c.is_active === undefined || c.is_active === true || Number(c.is_active) === 1;
+        const ringStatus = state.ring?.lastStatus?.[c.id];
+        const firstContestantId = Number(state.ring?.firstContestantId || 0);
+        const ledClass = !isActive ? "locked" : (ringStatus === "foul" || firstContestantId === Number(c.id) ? "buzzed" : (!state.ring?.locked ? "active" : ""));
+        const statusText = !isActive ? "Đã khóa tài khoản" : ringStatus === "foul" ? "PHẠM QUY" : ringStatus === "accepted" ? "Đã bấm" : ringStatus === "locked" ? "Đã khóa" : ringStatus === "timeout" ? "Hết giờ" : (state.ring?.locked ? "Đã khóa" : "Sẵn sàng");
+        const scoreValue = Number(c.score || 0);
+        return `<div class="candidate-card ${isActive ? "" : "inactive"}" data-candidate-id="${Number(c.id)}">
+          <img class="avatar" src="${escapeHtml(c.avatar_url || "/public/avatar.svg")}" onerror="this.onerror=null;this.src='/public/avatar.svg'">
+          <div class="candidate-info">
+            <div class="candidate-head">
+              <strong>${escapeHtml(c.seat_no || "")}. ${escapeHtml(c.display_name || "")}</strong>
+              <span class="score-chip">${scoreValue}</span>
+            </div>
+            <small>${escapeHtml(c.school || "")}</small>
+            <div class="candidate-status ${ringStatus === "foul" ? "foul-text" : ""}">
+              <span class="led ${ledClass}"></span><span>${statusText}</span>
+            </div>
+            <div class="candidate-actions">
+              <label class="score-edit">Điểm
+                <input class="candidate-score-input" type="number" value="${scoreValue}" onchange="OlympiaSocket.setScore(${Number(c.id)}, this.value)">
+              </label>
+              <button class="btn ${isActive ? "danger" : "success"}" type="button" data-candidate-toggle="${Number(c.id)}" data-active="${isActive ? "0" : "1"}">${isActive ? "Khóa" : "Mở lại"}</button>
+            </div>
+          </div>
+        </div>`;
+      }).join("");
+      document.querySelectorAll("[data-candidate-toggle]").forEach((button) => {
+        button.onclick = () => OlympiaSocket.setCandidateActive(Number(button.dataset.candidateToggle), button.dataset.active === "1");
+      });
+    }
+    function renderAnswers(state) {
+      const body = $("answersBody");
+      if (!body) return;
+      const signature = JSON.stringify((state.answers || []).map((a) => ({
+        id: a.id,
+        contestant_id: a.contestant_id,
+        answer_text: a.answer_text,
+        elapsed_ms: a.elapsed_ms,
+        is_correct: a.is_correct,
+        awarded_points: a.awarded_points,
+      })));
+      if (signature === answersSignature) return;
+      answersSignature = signature;
+      body.innerHTML = (state.answers || []).map((a) => `<tr>
+        <td>${escapeHtml(candidateName(a.contestant_id, state))}</td>
+        <td>${escapeHtml(a.answer_text)}</td>
+        <td>${a.elapsed_ms ?? ''}</td>
+        <td>
+          <button class="btn success" onclick="gradeAnswer(${Number(a.id)}, ${a.contestant_id || 'null'}, true)">Đúng</button>
+          <button class="btn danger" onclick="gradeAnswer(${Number(a.id)}, ${a.contestant_id || 'null'}, false)">Sai</button>
+        </td>
+      </tr>`).join("");
+    }
+    window.renderRealtimeState = function (state) {
+      fillContestantOptions(state);
+      setControlValue("rulePreset", state.rulePreset || "olympia26");
+      setControlValue("roundSelect", state.round || "setup");
+      const activeRoundTab = document.querySelector(`.nav-tab[data-round="${state.round || ''}"]`);
+      if (activeRoundTab && document.activeElement?.classList?.contains("nav-tab") !== true) {
+        setActiveNav(activeRoundTab);
+      }
+      setControlValue("warmupMode", state.warmup?.mode || "individual");
+      setControlValue("speedQuestionIndex", state.speed?.questionIndex || 1);
+      setControlValue("finishPackage", state.finish?.activePackagePoints || state.finish?.packagePoints?.[0] || 20);
+      setControlValue("finishStealMode", Boolean(state.finish?.stealMode));
+      setControlValue("showLogo", Boolean(state.ui?.showLogo));
+      setControlValue("allowNegative", Boolean(state.scoring?.allowNegativeScore));
+      renderCandidateCards(state);
+      renderAnswers(state);
+      renderAdminConsole(state);
+    };
+    renderSoundPack();
+    $("saveRoomUi").onclick = () => OlympiaSocket.patch({
+      rulePreset: $("rulePreset").value,
+      contestTitle: $("contestTitle").value,
+      scoring: { candidateCount: Number($("candidateCount").value), allowNegativeScore: $("allowNegative").checked },
+      ui: { showLogo: $("showLogo").checked, scoreboardMode: $("scoreboardMode").value, projectorMode: $("projectorMode").value },
+      warmup: { mode: $("warmupMode").value, activeContestantId: Number($("activeContestant").value || 0) || null },
+      speed: { questionIndex: Number($("speedQuestionIndex").value || 1) },
+      finish: {
+        activePackagePoints: Number($("finishPackage").value || 20),
+        activeContestantId: Number($("activeContestant").value || 0) || null,
+        stealMode: $("finishStealMode").checked
+      }
+    });
+    $("showQuestion").onclick = () => {
+      const state = OlympiaSocket.getState();
+      if ($("roundSelect").value === "finish" && !state.question?.starConfirmed) {
+        alert("Theo luật Về Đích, phải xác nhận Chọn/Không chọn Ngôi sao hy vọng trước khi hiển thị câu hỏi.");
+        return;
+      }
+      OlympiaSocket.patch({
+        round: $("roundSelect").value,
+        warmup: { mode: $("warmupMode").value, activeContestantId: Number($("activeContestant").value || 0) || null },
+        speed: { questionIndex: Number($("speedQuestionIndex").value || 1) },
+        finish: {
+          activePackagePoints: Number($("finishPackage").value || 20),
+          activeContestantId: Number($("activeContestant").value || 0) || null,
+          stealMode: $("finishStealMode").checked
+        },
+        ui: { showCandidateAnswers: false },
+        question: {
+          key: `${$("roundSelect").value}-${Date.now()}`,
+          text: $("questionText").value,
+          answer: $("questionAnswer").value,
+          mediaUrl: $("questionMedia").value,
+          visible: true,
+          answerVisible: false,
+          point: Number($("finishPackage").value || 20),
+          starConfirmed: $("roundSelect").value !== "finish" ? true : state.question?.starConfirmed
+        }
+      });
+      playSoundForRound("showQuestion");
+    };
+    $("showRoundUi").onclick = () => OlympiaSocket.patch({
+      round: $("roundSelect").value,
+      warmup: { mode: $("warmupMode").value, activeContestantId: Number($("activeContestant").value || 0) || null },
+      speed: { questionIndex: Number($("speedQuestionIndex").value || 1) },
+      finish: {
+        activePackagePoints: Number($("finishPackage").value || 20),
+        activeContestantId: Number($("activeContestant").value || 0) || null,
+        stealMode: $("finishStealMode").checked
+      }
+    });
+    $("showRoundUi").addEventListener("click", () => playSoundForRound("startRound"));
+    $("showAnswer").onclick = () => {
+      OlympiaSocket.patch({ question: { answerVisible: true } });
+      playSoundForRound("correct");
+    };
+    $("hideAnswer").onclick = () => OlympiaSocket.patch({ question: { answerVisible: false } });
+    $("toggleCandidateAnswers").onclick = () => {
+      const visible = Boolean(OlympiaSocket.getState().ui?.showCandidateAnswers);
+      OlympiaSocket.patch({ ui: { showCandidateAnswers: !visible } });
+      if (!visible) playSoundForRound("showAnswers");
+    };
+    document.querySelectorAll("[data-seconds]").forEach((button) => button.onclick = () => {
+      const seconds = Number(button.dataset.seconds);
+      OlympiaSocket.startTimer(seconds);
+      const sound = soundForTimer($("roundSelect").value, seconds);
+      if (sound) OlympiaSocket.playMedia(sound.sound[2], sound.sound[1]);
+    });
+    $("autoTimer").onclick = () => {
+      const seconds = Number($("timerSeconds").value || 0);
+      OlympiaSocket.startTimer();
+      const sound = soundForTimer($("roundSelect").value, seconds);
+      if (sound) OlympiaSocket.playMedia(sound.sound[2], sound.sound[1]);
+    };
+    $("nextWarmup").onclick = () => OlympiaSocket.nextWarmup();
+    $("stopTimer").onclick = () => OlympiaSocket.stopTimer();
+    $("unlockRing").onclick = () => {
+      OlympiaSocket.setRing(false, Number($("ringDelay").value));
+      playSoundForRound("claim");
+    };
+    $("lockRing").onclick = () => OlympiaSocket.setRing(true, Number($("ringDelay").value));
+    $("resetRing").onclick = () => OlympiaSocket.patch({ ring: { locked: true, firstContestantId: null, lastStatus: {} } });
+    $("starYes").onclick = () => {
+      OlympiaSocket.patch({ question: { starConfirmed: true, starEnabled: true }, finish: { activePackagePoints: Number($("finishPackage").value || 20) } });
+      playSound("finish.starChoose");
+    };
+    $("starNo").onclick = () => {
+      OlympiaSocket.patch({ question: { starConfirmed: true, starEnabled: false }, finish: { activePackagePoints: Number($("finishPackage").value || 20) } });
+      playSound("finish.choiceChosen");
+    };
+    $("tieStart").onclick = () => {
+      OlympiaSocket.patch({
+        round: "tie_breaker",
+        tieBreaker: { armed: true, foulContestantIds: [], winnerContestantId: null, finished: false },
+        ring: { locked: false, firstContestantId: null, lastStatus: {} }
+      });
+      OlympiaSocket.startTimer();
+    };
+    $("tieLock").onclick = () => OlympiaSocket.patch({ tieBreaker: { armed: false }, ring: { locked: true } });
+    $("resetRound").onclick = () => confirm("Reset toàn bộ phần thi hiện tại?") && OlympiaSocket.resetRound($("roundSelect").value);
+    $("rulePreset").onchange = () => OlympiaSocket.patch({ rulePreset: $("rulePreset").value });
+    $("warmupMode").onchange = () => OlympiaSocket.patch({ warmup: { mode: $("warmupMode").value }, ring: { locked: true, firstContestantId: null, lastStatus: {} } });
+    $("activeContestant").onchange = () => {
+      const state = OlympiaSocket.getState();
+      const activeId = Number($("activeContestant").value || 0) || null;
+      OlympiaSocket.patch({
+        warmup: {
+          activeContestantId: activeId,
+          questionIndex: state.round === "warmup" ? 0 : state.warmup?.questionIndex,
+          finished: false,
+          buzzedContestantId: null
+        },
+        finish: { activeContestantId: activeId }
+      });
+    };
+    $("speedQuestionIndex").onchange = () => OlympiaSocket.patch({ speed: { questionIndex: Number($("speedQuestionIndex").value || 1) } });
+    $("finishPackage").onchange = () => OlympiaSocket.patch({
+      finish: { activePackagePoints: Number($("finishPackage").value || 20), packagePoints: [20, 40] },
+      question: { point: Number($("finishPackage").value || 20), starConfirmed: false, starEnabled: false }
+    });
+    $("finishPackage").addEventListener("change", () => playSound("finish.packageChoose"));
+    $("finishStealMode").onchange = () => OlympiaSocket.patch({ finish: { stealMode: $("finishStealMode").checked } });
+    document.querySelectorAll("[data-reveal]").forEach((button) => button.onclick = () => {
+      const state = OlympiaSocket.getState();
+      const revealed = [...(state.puzzle?.revealed || [false,false,false,false,false])];
+      const tileIndex = Number(button.dataset.reveal) - 1;
+      revealed[tileIndex] = true;
+      OlympiaSocket.patch({ puzzle: { revealed, centerSelected: tileIndex === 4 } });
+      playSound(tileIndex === 4 ? "obstacle.grant" : "obstacle.pictureReveal");
+    });
+    $("revealAll").onclick = () => {
+      OlympiaSocket.patch({ puzzle: { revealed: [true, true, true, true, true], centerSelected: true } });
+      playSound("obstacle.pictureReveal");
+    };
+    $("preloadSpeed").onclick = () => OlympiaSocket.patch({ speed: { preloadRequested: true } });
+    $("showFirstImage").onclick = () => OlympiaSocket.patch({ speed: { showFirstImageBeforeTimer: true } });
+    $("splitDurations").onclick = () => {
+      const urls = $("speedUrls").value.split(/\r?\n|,/).map((v) => v.trim()).filter(Boolean);
+      const each = urls.length ? Math.max(1, Number($("autoSplitSeconds").value) / urls.length) : 0;
+      durationsCache = urls.map(() => each.toFixed(2)).join("\\n");
+      alert(`Đã chia ${urls.length} ảnh, mỗi ảnh ${each.toFixed(2)} giây`);
+    };
+    $("saveSpeedSequence").onclick = async () => {
+      const body = new URLSearchParams({ question_set_id: String(window.QUESTION_SET_ID || 1), speed_stt: $("speedStt").value, urls: $("speedUrls").value, durations: durationsCache });
+      await fetch("/api/speed-sequence", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+      OlympiaSocket.patch({ speed: { preloadRequested: true, imageSequence: $("speedUrls").value.split(/\r?\n|,/).map((v) => v.trim()).filter(Boolean) } });
+      alert("Đã lưu chuỗi ảnh.");
+    };
+    $("loadWall").onclick = async () => {
+      const response = await fetch(`/api/wall/${$("wallId").value}`);
+      const data = await response.json();
+      OlympiaSocket.patch({
+        round: "connecting_wall",
+        connectingWall: {
+          wallId: data.wall.id,
+          timeLimitSeconds: data.wall.time_limit_seconds,
+          cells: data.cells,
+          solvedGroups: []
+        }
+      });
+      OlympiaSocket.startTimer(data.wall.time_limit_seconds || 150);
+    };
+    $("playMedia").onclick = () => OlympiaSocket.playMedia($("mediaUrl").value, "Media ngoài");
+    $("stopMedia").onclick = () => OlympiaSocket.stopMedia();
+    $("sendNotice").onclick = () => OlympiaSocket.patch({ notice: $("mcNotice").value });
+  </script>
+</body>
+</html>

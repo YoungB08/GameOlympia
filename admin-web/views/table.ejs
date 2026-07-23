@@ -1,0 +1,46 @@
+<%- include('partials/header', { user, tables, current }) %>
+
+<section class="page-head">
+  <div>
+    <h1><%= meta.title %></h1>
+    <p><%= rows.length %> bản ghi</p>
+  </div>
+  <a class="primary" href="/admin/<%= key %>/new">Thêm mới</a>
+</section>
+
+<div class="panel table-panel">
+  <table>
+    <thead>
+      <tr>
+        <% meta.columns.forEach((col) => { %><th><%= col.label %></th><% }) %>
+        <th>Thao tác</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.forEach((row) => { %>
+        <tr>
+          <% meta.columns.forEach((col) => { %>
+            <td class="<%= col.type === 'textarea' ? 'wide-cell' : '' %>">
+              <% if (col.type === 'boolean') { %>
+                <%= row[col.name] ? 'Có / Đúng' : 'Không / Sai' %>
+              <% } else { %>
+                <%= row[col.name] === null || row[col.name] === undefined ? '' : row[col.name] %>
+              <% } %>
+            </td>
+          <% }) %>
+          <td class="actions">
+            <a href="/admin/<%= key %>/edit?<%= meta.primaryKey.map((pk) => `${encodeURIComponent(pk)}=${encodeURIComponent(row[pk])}`).join('&') %>">Sửa</a>
+            <form method="post" action="/admin/<%= key %>/delete" onsubmit="return confirm('Xóa bản ghi này?')">
+              <% meta.primaryKey.forEach((pk) => { %>
+                <input type="hidden" name="<%= pk %>" value="<%= row[pk] %>">
+              <% }) %>
+              <button type="submit">Xóa</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/footer') %>

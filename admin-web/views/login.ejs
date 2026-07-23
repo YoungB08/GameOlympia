@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Đăng nhập quản trị</title>
+  <link rel="stylesheet" href="/public/admin.css">
+</head>
+<body class="login-page">
+  <form class="login-card" method="post" action="/login">
+    <img class="login-logo" src="/assets/logo.png" alt="KNTech" onerror="this.style.display='none'">
+    <h1>Quản trị Olympia</h1>
+    <% if (error) { %><div class="alert"><%= error %></div><% } %>
+    <label>Tài khoản</label>
+    <input name="username" autocomplete="username" required autofocus>
+    <label>Mật khẩu</label>
+    <input name="password" type="password" autocomplete="current-password" required>
+    <button type="submit">Đăng nhập</button>
+    <p>Mặc định: <code>admin/admin</code></p>
+    <p class="copyright">
+      © <%= new Date().getFullYear() %> Bản quyền thuộc về
+      <a href="https://www.facebook.com/it.knz/" target="_blank" rel="noopener">KNTech</a>
+    </p>
+  </form>
+</body>
+</html>

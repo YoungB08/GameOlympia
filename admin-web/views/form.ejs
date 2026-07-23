@@ -1,0 +1,87 @@
+<%- include('partials/header', { user, tables, current }) %>
+
+<%
+  function toDateTimeLocalValue(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+    return date.toISOString().slice(0, 16);
+  }
+%>
+
+<section class="page-head">
+  <div>
+    <h1><%= mode === 'insert' ? 'Thêm mới' : 'Cập nhật' %> - <%= meta.title %></h1>
+  </div>
+  <a class="secondary" href="/admin/<%= key %>">Quay lại</a>
+</section>
+
+<form class="panel form-grid" method="post" action="/admin/<%= key %><%= mode === 'update' ? '/update' : '' %>" enctype="multipart/form-data">
+  <% meta.columns.forEach((col) => { %>
+    <% if (!(mode === 'insert' && col.generated)) { %>
+      <% const inputValue = col.type === 'datetime-local' ? toDateTimeLocalValue(row[col.name]) : (row[col.name] ?? ''); %>
+      <label class="<%= col.type === 'textarea' ? 'span-2' : '' %>">
+        <span><%= col.label %></span>
+        <% if (mode === 'update' && meta.primaryKey.includes(col.name)) { %>
+          <input type="hidden" name="<%= col.name %>" value="<%= row[col.name] %>">
+          <input value="<%= row[col.name] %>" disabled>
+        <% } else if (col.type === 'textarea') { %>
+          <textarea name="<%= col.name %>" <%= col.required ? 'required' : '' %>><%= row[col.name] || '' %></textarea>
+        <% } else if (col.type === 'select') { %>
+          <select name="<%= col.name %>" <%= col.required ? 'required' : '' %>>
+            <% col.options.forEach((option) => { %>
+              <option value="<%= option %>" <%= String(row[col.name] ?? '') === String(option) ? 'selected' : '' %>><%= option %></option>
+            <% }) %>
+          </select>
+        <% } else if (col.type === 'boolean') { %>
+          <select name="<%= col.name %>">
+            <option value="1" <%= row[col.name] ? 'selected' : '' %>>Có / Đúng</option>
+            <option value="0" <%= !row[col.name] ? 'selected' : '' %>>Không / Sai</option>
+          </select>
+        <% } else { %>
+          <input type="<%= col.type || 'text' %>" name="<%= col.name %>" value="<%= inputValue %>" <%= col.required ? 'required' : '' %>>
+        <% } %>
+      </label>
+    <% } %>
+  <% }) %>
+  <% if (meta.allowUpload) { %>
+    <label class="span-2">
+      <span>Tải lên tệp ảnh/âm thanh/video (&lt; 5MB)</span>
+      <input type="file" name="file">
+    </label>
+  <% } %>
+  <div class="form-actions span-2">
+    <button class="primary" type="submit">Lưu</button>
+    <a class="secondary" href="/admin/<%= key %>">Hủy</a>
+  </div>
+</form>
+
+<script>
+  (() => {
+    const pad = (value) => String(value).padStart(2, "0");
+    const toDateTimeLocal = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    const now = new Date();
+    now.setSeconds(0, 0);
+    document.querySelectorAll('input[type="datetime-local"]').forEach((input, index) => {
+      if (input.value) return;
+      const date = new Date(now.getTime() + index * 2 * 60 * 60 * 1000);
+      input.value = toDateTimeLocal(date);
+    });
+    const fromInput = document.querySelector('[name="scheduled_from"]');
+    const toInput = document.querySelector('[name="scheduled_to"]');
+    const fixRange = () => {
+      if (!fromInput || !toInput || !fromInput.value) return;
+      const from = new Date(fromInput.value);
+      const to = new Date(toInput.value);
+      if (Number.isNaN(from.getTime())) return;
+      if (!toInput.value || Number.isNaN(to.getTime()) || to <= from) {
+        toInput.value = toDateTimeLocal(new Date(from.getTime() + 2 * 60 * 60 * 1000));
+      }
+    };
+    fromInput?.addEventListener("change", fixRange);
+    fixRange();
+  })();
+</script>
+
+<%- include('partials/footer') %>

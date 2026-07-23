@@ -1,0 +1,150 @@
+﻿<windows:Window
+	x:Class="Olympia_ThiSinh.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:Olympia_ThiSinh" xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+	Style="{StaticResource MaterialDesignWindow}"
+	TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+	TextElement.FontWeight="Regular"
+	TextElement.FontSize="13"
+	TextOptions.TextFormattingMode="Ideal"
+	TextOptions.TextRenderingMode="Auto"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	ResizeMode="NoResize"
+	WindowState="Maximized"
+	WindowStyle="None"
+	Title="MainWindow"
+	Height="1080"
+	Width="1920" xmlns:windows="clr-namespace:System.Windows;assembly=PresentationFramework">
+	<Control.Background>
+		<ImageBrush
+			ImageSource="Images/background.jpg" />
+	</Control.Background>
+	<Grid>
+		<Grid>
+			<Grid.RowDefinitions>
+				<RowDefinition
+					Height="205" />
+				<RowDefinition />
+			</Grid.RowDefinitions>
+			<Grid
+				Row="0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition
+						Width="auto" />
+					<ColumnDefinition />
+					<ColumnDefinition
+						Width="200" />
+				</Grid.ColumnDefinitions>
+				<Border
+					Grid.Column="0"
+					BorderBrush="#FFFFFFFF"
+					BorderThickness="2"
+					CornerRadius="3 "
+					Margin="5">
+					<StackPanel
+						Name="StackPanelListStudent"
+						Margin="5">
+						<local:StudentUI
+							Name="FirstStudent"
+							Width="250"
+							HorizontalAlignment="Left"
+							Height="40"
+							Margin="5 5 5 0" />
+						<local:StudentUI
+							Name="SecondStudent"
+							Width="250"
+							HorizontalAlignment="Left"
+							Height="40"
+							Margin="5 5 5 0" />
+						<local:StudentUI
+							Name="ThirdStudent"
+							Width="250"
+							HorizontalAlignment="Left"
+							Height="40"
+							Margin="5 5 5 0" />
+						<local:StudentUI
+							Name="FourthStudent"
+							Width="250"
+							HorizontalAlignment="Left"
+							Height="40"
+							Margin="5 5 5 0" />
+					</StackPanel>
+				</Border>
+				<Grid
+					Column="2">
+					<Button
+						Name="btnExit"
+						Background="#FFFF0000"
+						Content="Thoát"
+						HorizontalAlignment="Right"
+						VerticalAlignment="Top"
+						Width="100"
+						Margin="5"
+						Click="Exit_Click" />
+				</Grid>
+			</Grid>
+			<Grid
+				Name="GridInfoUser"
+				Row="1">
+				<StackPanel
+					HorizontalAlignment="Center"
+					VerticalAlignment="Center">
+					<StackPanel
+						Orientation="Horizontal">
+						<TextBlock
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							FontSize="28"
+							Foreground="#FFFFFFFF"
+							Margin="0 0 10 0">Tên:</TextBlock>
+						<Border
+							BorderBrush="#FFFFFFFF"
+							BorderThickness="2">
+							<TextBox
+								Name="txtName"
+								Margin="3 0 0 0"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								FontSize="28"
+								CaretBrush="#FFFFFFFF"
+								Width="400"
+								Foreground="#FFFFFFFF" />
+						</Border>
+					</StackPanel>
+					<StackPanel
+						Orientation="Horizontal"
+						Margin="0 10 0 0">
+						<TextBlock
+							HorizontalAlignment="Center"
+							VerticalAlignment="Center"
+							FontSize="28"
+							Foreground="#FFFFFFFF"
+							Margin="0 0 30 0">IP:</TextBlock>
+						<Border
+							BorderBrush="#FFFFFFFF"
+							BorderThickness="2">
+							<TextBox
+								Name="txtIp"
+								Margin="3 0 0 0"
+								HorizontalAlignment="Center"
+								VerticalAlignment="Center"
+								FontSize="28"
+								CaretBrush="#FFFFFFFF"
+								Width="400"
+								Foreground="#FFFFFFFF" />
+						</Border>
+					</StackPanel>
+					<Button
+						Name="Confirm"
+						Margin="0 20 0 0"
+						Width="150"
+						Background="#FFFFA500"
+						Height="40"
+						Foreground="#FF000000"
+						FontSize="20"
+						Click="Confirm_Click">Xác nhận</Button>
+				</StackPanel>
+			</Grid>
+		</Grid>
+		<Grid
+			Name="MainGrid" />
+	</Grid>
+</windows:Window>

@@ -1,0 +1,415 @@
+﻿<controls:UserControl
+	x:Class="Olympia_ThiSinh.ObstacleUI" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:local="clr-namespace:Olympia_ThiSinh" xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+	TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+	TextElement.FontWeight="Regular"
+	TextElement.FontSize="13"
+	TextOptions.TextFormattingMode="Ideal"
+	TextOptions.TextRenderingMode="Auto"
+	FontFamily="{DynamicResource MaterialDesignFont}" xmlns:controls="clr-namespace:System.Windows.Controls;assembly=PresentationFramework">
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition
+				Height="205" />
+			<RowDefinition />
+		</Grid.RowDefinitions>
+		<Grid
+			Row="0">
+			<Grid
+				Column="1">
+				<Grid.RowDefinitions>
+					<RowDefinition />
+					<RowDefinition
+						Height="35" />
+				</Grid.RowDefinitions>
+				<TextBlock
+					HorizontalAlignment="Center"
+					VerticalAlignment="Center"
+					FontSize="45"
+					FontWeight="Bold"
+					Foreground="#FFFFFFFF"
+					Text="Phần thi: Vượt chướng ngại vật"
+					Margin="30" />
+				<Grid
+					Row="2">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition />
+						<ColumnDefinition />
+						<ColumnDefinition />
+						<ColumnDefinition />
+						<ColumnDefinition />
+						<ColumnDefinition />
+						<ColumnDefinition />
+						<ColumnDefinition />
+					</Grid.ColumnDefinitions>
+					<local:StudentUI
+						Name="FirstClaimStudent"
+						Visibility="Collapsed"
+						Margin="5 0 5 0"
+						Grid.Column="2" />
+					<local:StudentUI
+						Name="SecondClaimStudent"
+						Visibility="Collapsed"
+						Margin="5 0 5 0"
+						Grid.Column="3" />
+					<local:StudentUI
+						Name="ThirdClaimStudent"
+						Visibility="Collapsed"
+						Margin="5 0 5 0"
+						Grid.Column="4" />
+					<local:StudentUI
+						Name="FourthClaimStudent"
+						Visibility="Collapsed"
+						Margin="5 0 5 0"
+						Grid.Column="5" />
+				</Grid>
+			</Grid>
+		</Grid>
+		<Border
+			Grid.Row="1"
+			BorderBrush="#FFFFFFFF"
+			BorderThickness="2"
+			CornerRadius="0 0 3 3 "
+			Margin="5">
+			<Border.Background>
+				<SolidColorBrush
+					Color="Black"
+					Opacity="0.5" />
+			</Border.Background>
+			<Grid>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition />
+				</Grid.ColumnDefinitions>
+				<Grid
+					Margin="0 10 0 10"
+					Column="0">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition
+							Width="*" />
+						<ColumnDefinition
+							Width="9.5*" />
+						<ColumnDefinition
+							Width="*" />
+					</Grid.ColumnDefinitions>
+					<Grid
+						Column="1">
+						<Grid.RowDefinitions>
+							<RowDefinition
+								Height="5*" />
+							<RowDefinition
+								Height="4.5*" />
+						</Grid.RowDefinitions>
+						<Grid
+							Row="0">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition
+									Width="4*" />
+								<ColumnDefinition
+									Width="5*" />
+							</Grid.ColumnDefinitions>
+							<Grid
+								Margin="0 0 4 0"
+								Column="0">
+								<Grid>
+									<Panel.Background>
+										<ImageBrush
+											x:Name="ImageQuestion"
+											Stretch="Fill" />
+									</Panel.Background>
+								</Grid>
+								<Grid
+									Name="FirstObstacle">
+									<Panel.Background>
+										<ImageBrush
+											Stretch="Fill"
+											ImageSource="Images/topLeft.png" />
+									</Panel.Background>
+								</Grid>
+								<Grid
+									Name="SecondObstacle">
+									<Panel.Background>
+										<ImageBrush
+											Stretch="Fill"
+											ImageSource="Images/topRight.png" />
+									</Panel.Background>
+								</Grid>
+								<Grid
+									Name="ThirdObstacle">
+									<Panel.Background>
+										<ImageBrush
+											Stretch="Fill"
+											ImageSource="Images/bottomRight.png" />
+									</Panel.Background>
+								</Grid>
+								<Grid
+									Name="FourthObstacle">
+									<Panel.Background>
+										<ImageBrush
+											Stretch="Fill"
+											ImageSource="Images/bottomLeft.png" />
+									</Panel.Background>
+								</Grid>
+								<Grid
+									Name="CentreObstacle">
+									<Panel.Background>
+										<ImageBrush
+											Stretch="Fill"
+											ImageSource="Images/center.png" />
+									</Panel.Background>
+								</Grid>
+							</Grid>
+							<Grid
+								Column="1">
+								<Panel.Background>
+									<ImageBrush
+										Stretch="Fill"
+										ImageSource="Images/obstacle1234.png" />
+								</Panel.Background>
+								<Grid.RowDefinitions>
+									<RowDefinition />
+									<RowDefinition />
+									<RowDefinition />
+									<RowDefinition />
+									<RowDefinition />
+								</Grid.RowDefinitions>
+								<TextBlock
+									Name="txtObstacleAnswer"
+									Grid.Row="0"
+									Text="CHƯỚNG NGẠI VẬT CÓ 10 CHỮ CÁI"
+									HorizontalAlignment="Center"
+									FontSize="30"
+									Margin="0 7 0 0"
+									Foreground="#FFFFFFFF"
+									FontWeight="Bold" />
+								<Grid
+									Row="1"
+									Margin="0 0 5 0">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition />
+										<ColumnDefinition
+											Width="60" />
+									</Grid.ColumnDefinitions>
+									<Viewbox
+										Margin="5 0 0 0"
+										Grid.Column="0"
+										HorizontalAlignment="Left">
+										<Grid
+											Name="FirstLine" />
+									</Viewbox>
+									<Grid
+										Column="1"
+										Margin="0 5 0 0">
+										<Panel.Background>
+											<ImageBrush
+												ImageSource="Images/1.png"
+												Stretch="UniformToFill" />
+										</Panel.Background>
+									</Grid>
+								</Grid>
+								<Grid
+									Row="2"
+									Margin="0 0 5 0">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition />
+										<ColumnDefinition
+											Width="60" />
+									</Grid.ColumnDefinitions>
+									<Viewbox
+										Margin="5 0 0 0 "
+										Grid.Column="0"
+										HorizontalAlignment="Left">
+										<Grid
+											Name="SecondLine" />
+									</Viewbox>
+									<Grid
+										Column="1"
+										Margin="0 5 0 0">
+										<Panel.Background>
+											<ImageBrush
+												ImageSource="Images/2.png"
+												Stretch="UniformToFill" />
+										</Panel.Background>
+									</Grid>
+								</Grid>
+								<Grid
+									Row="3"
+									Margin="0 0 5 0">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition />
+										<ColumnDefinition
+											Width="60" />
+									</Grid.ColumnDefinitions>
+									<Viewbox
+										Margin="5 0 0 0"
+										Grid.Column="0"
+										HorizontalAlignment="Left">
+										<Grid
+											Name="ThirdLine" />
+									</Viewbox>
+									<Grid
+										Column="1"
+										Margin="0 5 0 0">
+										<Panel.Background>
+											<ImageBrush
+												ImageSource="Images/3.png"
+												Stretch="UniformToFill" />
+										</Panel.Background>
+									</Grid>
+								</Grid>
+								<Grid
+									Row="4"
+									Margin="0 0 5 0">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition />
+										<ColumnDefinition
+											Width="60" />
+									</Grid.ColumnDefinitions>
+									<Viewbox
+										Margin="5 0 0 0"
+										Grid.Column="0"
+										HorizontalAlignment="Left">
+										<Grid
+											Name="FourthLine" />
+									</Viewbox>
+									<Grid
+										Column="1"
+										Margin="0 5 0 0">
+										<Panel.Background>
+											<ImageBrush
+												ImageSource="Images/4.png"
+												Stretch="UniformToFill" />
+										</Panel.Background>
+									</Grid>
+								</Grid>
+							</Grid>
+						</Grid>
+						<Grid
+							Row="1">
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition
+									Width="5.5*" />
+								<ColumnDefinition
+									Width="4*" />
+							</Grid.ColumnDefinitions>
+							<Grid
+								Margin="0 4 0 4"
+								Column="0">
+								<Panel.Background>
+									<ImageBrush
+										ImageSource="Images/obstacleQuestion.png"
+										Stretch="Fill" />
+								</Panel.Background>
+								<TextBlock
+									Name="txtQuestion"
+									TextWrapping="Wrap"
+									Margin="15 10 30 5"
+									FontSize="28"
+									Foreground="#FFFFFFFF" />
+								<MediaElement
+									Name="SoundQuestion"
+									LoadedBehavior="Manual" />
+							</Grid>
+							<Grid
+								Margin="4 4 0 4"
+								Column="1">
+								<Panel.Background>
+									<ImageBrush
+										ImageSource="Images/obstacleAnswer.png" />
+								</Panel.Background>
+								<Grid.RowDefinitions>
+									<RowDefinition
+										Height="auto" />
+									<RowDefinition />
+								</Grid.RowDefinitions>
+								<Grid
+									Row="0">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition />
+										<ColumnDefinition />
+										<ColumnDefinition />
+									</Grid.ColumnDefinitions>
+									<Viewbox
+										Margin="5 15 5 5"
+										Grid.Column="1">
+										<Grid>
+											<Ellipse
+												Width="150"
+												Height="150"
+												Fill="#FFFFC0CB" />
+											<TextBlock
+												Name="txtCountDown"
+												Foreground="#FF000000"
+												FontSize="80"
+												Text="15"
+												HorizontalAlignment="Center"
+												VerticalAlignment="Center" />
+										</Grid>
+									</Viewbox>
+									<Grid
+										Column="2">
+										<Button
+											Name="btnClaim"
+											Width="120"
+											Height="60"
+											Background="#FF8B0000"
+											HorizontalAlignment="Right"
+											VerticalAlignment="Top"
+											Margin="10 20 10 10"
+											Click="btnClaim_Click">
+											<StackPanel>
+												<TextBlock
+													Text="Trả lời"
+													Foreground="#FFFFFFFF"
+													FontSize="20" />
+												<TextBlock
+													TextAlignment="Center"
+													Text="CNV"
+													Foreground="#FFFFFFFF"
+													FontSize="19" />
+											</StackPanel>
+										</Button>
+									</Grid>
+								</Grid>
+								<Grid
+									Row="1">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition />
+										<ColumnDefinition
+											Width="auto" />
+									</Grid.ColumnDefinitions>
+									<Border
+										Grid.Column="0"
+										Margin="2 5 5 40"
+										VerticalAlignment="Bottom"
+										BorderBrush="#FFFFFFFF"
+										BorderThickness="2"
+										CornerRadius="2">
+										<TextBox
+											Name="txtAnswer"
+											Margin="1 0 0 0"
+											CaretBrush="#FFF5DEB3"
+											Foreground="#FFFFFFFF"
+											FontSize="30" />
+									</Border>
+									<Button
+										Name="btnSend"
+										IsDefault="True"
+										IsEnabled="False"
+										materialDesign:RippleAssist.Feedback="#DD000000"
+										Width="100"
+										Height="50"
+										Grid.Column="1"
+										Margin="0 0 0 40"
+										VerticalAlignment="Bottom"
+										Background="#FFADFF2F"
+										Click="btnSend_Click">
+										<TextBlock>Gửi (Enter)</TextBlock>
+									</Button>
+								</Grid>
+							</Grid>
+						</Grid>
+					</Grid>
+				</Grid>
+			</Grid>
+		</Border>
+	</Grid>
+</controls:UserControl>

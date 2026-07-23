@@ -1,0 +1,8 @@
+<%- include('partials/header', { user, tables, current }) %>
+<section class="page-head">
+  <h1>Lỗi</h1>
+</section>
+<div class="panel">
+  <pre><%= error.stack || error.message || error %></pre>
+</div>
+<%- include('partials/footer') %>

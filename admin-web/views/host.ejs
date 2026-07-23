@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Host - <%= room.room_code %></title>
+  <link rel="stylesheet" href="/public/broadcast.css">
+</head>
+<body class="broadcast">
+  <main class="tech-main">
+    <section class="glass">
+      <div class="top-line">
+        <h1 id="hostRound">SETUP</h1>
+        <div class="score-frame">Còn <span id="hostTimer">0</span>s</div>
+      </div>
+      <h2>Câu hỏi</h2>
+      <div class="question-box" id="hostQuestion">Đang chờ kỹ thuật...</div>
+      <h2>Đáp án</h2>
+      <div class="question-box" style="color:#f59e0b" id="hostAnswer">---</div>
+      <h2 class="mc-notice" id="hostNotice"></h2>
+    </section>
+    <section class="glass" style="margin-top:14px">
+      <h2>Trạng thái thí sinh</h2>
+      <div id="hostCandidates" class="section-grid"></div>
+    </section>
+  </main>
+  <script>window.ROOM_CODE = "<%= room.room_code %>";</script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/public/realtime-client.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    window.renderRealtimeState = function (state) {
+      $("hostRound").textContent = String(state.round || "setup").toUpperCase();
+      $("hostTimer").textContent = state.timer?.remaining ?? 0;
+      $("hostQuestion").textContent = state.question?.text || "Đang chờ kỹ thuật...";
+      $("hostAnswer").textContent = state.question?.answer || "---";
+      $("hostNotice").textContent = state.notice || "";
+      $("hostCandidates").innerHTML = (state.candidates || []).map((c) => {
+        const status = state.ring?.lastStatus?.[c.id] === "foul" ? '<br><span class="foul-text">PHẠM QUY</span>' : "";
+        const winner = Number(state.tieBreaker?.winnerContestantId) === Number(c.id) ? '<br><span style="color:#10b981;font-weight:900">THẮNG CÂU HỎI PHỤ</span>' : "";
+        return `<div class="candidate-card">
+        <img class="avatar" src="${c.avatar_url || '/public/avatar.svg'}">
+        <div><strong>${c.display_name}</strong><br><small>${c.school || ''}</small><br>Điểm: ${c.score}${status}${winner}</div>
+      </div>`;
+      }).join("");
+    };
+  </script>
+</body>
+</html>

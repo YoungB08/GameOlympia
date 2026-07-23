@@ -1,0 +1,52 @@
+<%- include('partials/header', { user, tables, current }) %>
+
+<section class="page-head">
+  <h1>Tổng quan</h1>
+  <p>Quản lý đề thi, media, máy chủ/phòng thi, thí sinh và bảng điểm dùng chung với app Python.</p>
+</section>
+
+<section class="stats-grid">
+  <% Object.entries(tables).forEach(([key, table]) => { %>
+    <a class="stat" href="/admin/<%= key %>">
+      <span><%= table.title %></span>
+      <strong><%= counts[key] || 0 %></strong>
+    </a>
+  <% }) %>
+</section>
+
+<section class="two-col">
+  <div class="panel">
+    <h2>Phòng thi gần đây</h2>
+    <table>
+      <thead><tr><th>Máy chủ</th><th>Mã phòng</th><th>Mục đích</th><th>Trạng thái</th></tr></thead>
+      <tbody>
+        <% rooms.forEach((room) => { %>
+          <tr>
+            <td><%= room.server_name %></td>
+            <td><%= room.room_code %></td>
+            <td><%= room.purpose %></td>
+            <td><span class="pill"><%= room.status %></span></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <div class="panel">
+    <h2>Tín hiệu thí sinh</h2>
+    <table>
+      <thead><tr><th>Phòng</th><th>Thí sinh</th><th>Sự kiện</th><th>Thời gian</th></tr></thead>
+      <tbody>
+        <% events.forEach((event) => { %>
+          <tr>
+            <td><%= event.room_id %></td>
+            <td><%= event.contestant_id || '-' %></td>
+            <td><%= event.event_type %></td>
+            <td><%= event.created_at ? new Date(event.created_at).toISOString().slice(0, 19).replace('T', ' ') : '' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

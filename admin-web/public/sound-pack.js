@@ -1,0 +1,86 @@
+(function () {
+  window.OLYMPIA_SOUND_GROUPS = [
+    {
+      key: "starting",
+      title: "Khởi động",
+      round: "warmup",
+      sounds: [
+        ["starting.startRound", "Bắt đầu phần thi", "/sounds/Starting/StartRound.mp3"],
+        ["starting.startTurn", "Bắt đầu lượt thi", "/sounds/Starting/StartTurn.mp3"],
+        ["starting.mainTime", "Nhạc nền chính", "/sounds/Starting/MainTime.mp3"],
+        ["starting.claim", "Bấm chuông giành quyền", "/sounds/Starting/Claim.mp3"],
+        ["starting.correct", "Trả lời đúng", "/sounds/Starting/CorrectAnswer.mp3"],
+        ["starting.wrong", "Trả lời sai", "/sounds/Starting/WrongAnswer.mp3"],
+        ["starting.finishTurn", "Kết thúc lượt thi", "/sounds/Starting/FinishTurn.mp3"],
+      ],
+    },
+    {
+      key: "obstacle",
+      title: "Vượt chướng ngại vật",
+      round: "obstacle",
+      sounds: [
+        ["obstacle.startRound", "Bắt đầu phần thi", "/sounds/Obstacle/StartRound.mp3"],
+        ["obstacle.rowQuestion", "Hiển thị câu hỏi hàng ngang", "/sounds/Obstacle/RowQuestShow.mp3"],
+        ["obstacle.15", "Thời gian suy nghĩ 15s", "/sounds/Obstacle/15Seconds.mp3"],
+        ["obstacle.answers", "Hiển thị đáp án thí sinh", "/sounds/Obstacle/AnswersShowing.mp3"],
+        ["obstacle.correctRow", "Đúng hàng ngang", "/sounds/Obstacle/CorrectRow.mp3"],
+        ["obstacle.wrongRow", "Sai hàng ngang/CNV", "/sounds/Obstacle/WrongRow.mp3"],
+        ["obstacle.grant", "Bấm chuông trả lời CNV", "/sounds/Obstacle/ObstacleGrant.mp3"],
+        ["obstacle.correctObstacle", "Đúng chướng ngại vật", "/sounds/Obstacle/CorrectObstacle.mp3"],
+        ["obstacle.pictureReveal", "Lật mảnh ghép", "/sounds/Obstacle/PictureReveal.mp3"],
+      ],
+    },
+    {
+      key: "acceleration",
+      title: "Tăng tốc",
+      round: "speed",
+      sounds: [
+        ["speed.startRound", "Bắt đầu phần thi", "/sounds/Acceleration/StartRound.mp3"],
+        ["speed.question", "Hiển thị câu hỏi", "/sounds/Acceleration/QuestionShowing.mp3"],
+        ["speed.10", "Đếm giờ 10s", "/sounds/Acceleration/10Seconds.mp3"],
+        ["speed.20", "Đếm giờ 20s", "/sounds/Acceleration/20Seconds.mp3"],
+        ["speed.30", "Đếm giờ 30s", "/sounds/Acceleration/30Seconds.mp3"],
+        ["speed.40", "Đếm giờ 40s", "/sounds/Acceleration/40Seconds.mp3"],
+        ["speed.answers", "Hiển thị đáp án thí sinh", "/sounds/Acceleration/AnswersShowing.mp3"],
+        ["speed.correct", "Công bố đáp án đúng", "/sounds/Acceleration/Correct.mp3"],
+      ],
+    },
+    {
+      key: "finish",
+      title: "Về đích",
+      round: "finish",
+      sounds: [
+        ["finish.startRound", "Bắt đầu phần thi", "/sounds/Finish/StartRound.mp3"],
+        ["finish.startTurn", "Bắt đầu lượt thí sinh", "/sounds/Finish/StartTurn.mp3"],
+        ["finish.packageChoose", "Chọn gói câu hỏi", "/sounds/Finish/PackageChoose.mp3"],
+        ["finish.choiceChosen", "Xác nhận lựa chọn", "/sounds/Finish/ChoiceChosen.mp3"],
+        ["finish.starChoose", "Ngôi sao hy vọng", "/sounds/Finish/StarChoose.mp3"],
+        ["finish.5", "Đếm giờ 5s", "/sounds/Finish/5Seconds.mp3"],
+        ["finish.15", "Đếm giờ 15s", "/sounds/Finish/15Seconds.mp3"],
+        ["finish.20", "Đếm giờ 20s", "/sounds/Finish/20Seconds.mp3"],
+        ["finish.grant", "Bấm chuông giành quyền", "/sounds/Finish/Grant.mp3"],
+        ["finish.correct", "Trả lời đúng", "/sounds/Finish/CorrectFinish.mp3"],
+        ["finish.wrong", "Trả lời sai", "/sounds/Finish/WrongFinish.mp3"],
+        ["finish.finishRound", "Kết thúc phần thi", "/sounds/Finish/FinishRound.mp3"],
+      ],
+    },
+    {
+      key: "subquestion",
+      title: "Câu hỏi phụ",
+      round: "tie_breaker",
+      sounds: [
+        ["subquestion.question", "Hiển thị câu hỏi phụ", "/sounds/SubQuestion/QuestionShowing.mp3"],
+        ["subquestion.15", "Đếm giờ 15s", "/sounds/SubQuestion/15Seconds.mp3"],
+        ["subquestion.claim", "Bấm chuông giành quyền", "/sounds/SubQuestion/Claim.mp3"],
+      ],
+    },
+    {
+      key: "summary",
+      title: "Tổng kết",
+      round: "summary",
+      sounds: [
+        ["summary.points", "Nhạc tổng kết điểm", "/sounds/Main/PointSummary.mp3"],
+      ],
+    },
+  ];
+})();

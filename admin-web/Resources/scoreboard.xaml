@@ -1,0 +1,183 @@
+﻿<windows:Window
+	x:Class="Olympia_ThiSinh.ScoreBoard" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:Olympia_ThiSinh"
+	ResizeMode="NoResize"
+	WindowStyle="None"
+	WindowState="Maximized"
+	Width="{x:Static SystemParameters.PrimaryScreenWidth}"
+	Height="{x:Static SystemParameters.PrimaryScreenHeight}" xmlns:windows="clr-namespace:System.Windows;assembly=PresentationFramework">
+	<Control.Background>
+		<ImageBrush
+			ImageSource="Images/background.jpg" />
+	</Control.Background>
+	<Viewbox>
+		<Grid>
+			<Panel.Background>
+				<ImageBrush />
+			</Panel.Background>
+			<Rectangle
+				HorizontalAlignment="Center"
+				Height="901"
+				Stroke="#00000000"
+				VerticalAlignment="Center"
+				Width="1599"
+				StrokeThickness="0"
+				Visibility="Hidden" />
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="187"
+				Margin="68,23,0,0"
+				VerticalAlignment="Top"
+				Width="813">
+				<Shape.Fill>
+					<ImageBrush
+						ImageSource="/Images/scoreBoard.png" />
+				</Shape.Fill>
+			</Rectangle>
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="187"
+				Margin="276,245,0,0"
+				VerticalAlignment="Top"
+				Width="813">
+				<Shape.Fill>
+					<ImageBrush
+						ImageSource="/Images/scoreBoard.png" />
+				</Shape.Fill>
+			</Rectangle>
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="187"
+				Margin="491,466,0,0"
+				VerticalAlignment="Top"
+				Width="813">
+				<Shape.Fill>
+					<ImageBrush
+						ImageSource="/Images/scoreBoard.png" />
+				</Shape.Fill>
+			</Rectangle>
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="187"
+				Margin="708,684,0,0"
+				VerticalAlignment="Top"
+				Width="813">
+				<Shape.Fill>
+					<ImageBrush
+						ImageSource="/Images/scoreBoard.png" />
+				</Shape.Fill>
+			</Rectangle>
+			<TextBlock
+				Name="FirstName"
+				Tag=""
+				TextAlignment="Center"
+				Height="81"
+				Margin="448,23,0,0"
+				TextWrapping="Wrap"
+				Text="Empty"
+				VerticalAlignment="Top"
+				Width="433"
+				FontSize="55"
+				HorizontalAlignment="Left"
+				FontWeight="Bold"
+				Foreground="#FFFFFFFF" />
+			<TextBlock
+				Name="SecondName"
+				Tag=""
+				TextAlignment="Center"
+				Height="81"
+				Margin="656,245,0,0"
+				TextWrapping="Wrap"
+				Text="Empty"
+				VerticalAlignment="Top"
+				Width="433"
+				FontSize="55"
+				HorizontalAlignment="Left"
+				FontWeight="Bold"
+				Foreground="#FFFFFFFF" />
+			<TextBlock
+				Name="ThirdName"
+				Tag=""
+				TextAlignment="Center"
+				Height="81"
+				Margin="871,466,0,0"
+				TextWrapping="Wrap"
+				Text="Empty"
+				VerticalAlignment="Top"
+				Width="433"
+				FontSize="55"
+				HorizontalAlignment="Left"
+				FontWeight="Bold"
+				Foreground="#FFFFFFFF" />
+			<TextBlock
+				Name="FourthName"
+				Tag=""
+				TextAlignment="Center"
+				Height="81"
+				Margin="1088,684,0,0"
+				TextWrapping="Wrap"
+				Text="Empty"
+				VerticalAlignment="Top"
+				Width="433"
+				FontSize="55"
+				HorizontalAlignment="Left"
+				FontWeight="Bold"
+				Foreground="#FFFFFFFF" />
+			<TextBlock
+				Name="FirstScore"
+				Tag=""
+				TextAlignment="Center"
+				HorizontalAlignment="Left"
+				Height="101"
+				Margin="68,91,0,0"
+				TextWrapping="Wrap"
+				Text="0"
+				VerticalAlignment="Top"
+				Width="813"
+				Foreground="#FFFFFFFF"
+				FontWeight="Bold"
+				FontSize="85" />
+			<TextBlock
+				Name="SecondScore"
+				Tag=""
+				TextAlignment="Center"
+				HorizontalAlignment="Left"
+				Height="101"
+				Margin="276,314,0,0"
+				TextWrapping="Wrap"
+				Text="0"
+				VerticalAlignment="Top"
+				Width="813"
+				Foreground="#FFFFFFFF"
+				FontWeight="Bold"
+				FontSize="85" />
+			<TextBlock
+				Name="ThirdScore"
+				Tag=""
+				TextAlignment="Center"
+				HorizontalAlignment="Left"
+				Height="101"
+				Margin="491,535,0,0"
+				TextWrapping="Wrap"
+				Text="0"
+				VerticalAlignment="Top"
+				Width="813"
+				Foreground="#FFFFFFFF"
+				FontWeight="Bold"
+				FontSize="85" />
+			<TextBlock
+				Name="FourthScore"
+				Tag=""
+				TextAlignment="Center"
+				HorizontalAlignment="Left"
+				Height="101"
+				Margin="708,753,0,0"
+				TextWrapping="Wrap"
+				Text="0"
+				VerticalAlignment="Top"
+				Width="813"
+				Foreground="#FFFFFFFF"
+				FontWeight="Bold"
+				FontSize="85" />
+		</Grid>
+	</Viewbox>
+</windows:Window>

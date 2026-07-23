@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bảng điểm - <%= room.room_code %></title>
+  <link rel="stylesheet" href="/public/broadcast.css">
+</head>
+<body class="broadcast">
+  <main class="client-shell">
+    <div class="client-content">
+      <div class="top-line">
+        <div class="badge" id="scoreTitle">Tổng kết điểm</div>
+        <div class="score-frame" id="scoreRound">SUMMARY</div>
+      </div>
+      <section class="score-bars" id="scoreBars"></section>
+    </div>
+  </main>
+  <script>window.ROOM_CODE = "<%= room.room_code %>";</script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/public/realtime-client.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    window.renderRealtimeState = function (state) {
+      $("scoreTitle").textContent = state.contestTitle || "Tổng kết điểm";
+      $("scoreRound").textContent = String(state.round || "summary").toUpperCase();
+      const candidates = [...(state.candidates || [])].sort((a, b) => Number(a.score) - Number(b.score));
+      const max = Math.max(1, ...candidates.map((c) => Number(c.score)));
+      $("scoreBars").innerHTML = candidates.map((c, index) => {
+        const height = Math.max(8, Math.abs(Number(c.score)) / max * 100);
+        const crown = index === candidates.length - 1 ? "TOP<br>" : "";
+        return `<div class="score-bar">
+          <div class="diamond-score"><span>${crown}${c.score}</span></div>
+          <div class="score-fill" style="height:${height}%"></div>
+          <div class="diamond-name">${c.display_name}</div>
+        </div>`;
+      }).join("");
+    };
+  </script>
+</body>
+</html>

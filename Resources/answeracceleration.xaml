@@ -1,0 +1,646 @@
+﻿<windows:Window
+	x:Class="Olympia_ThiSinh.AnswerAcceleration" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:Olympia_ThiSinh"
+	ResizeMode="NoResize"
+	WindowStyle="None"
+	WindowState="Maximized"
+	Width="{x:Static SystemParameters.PrimaryScreenWidth}"
+	Height="{x:Static SystemParameters.PrimaryScreenHeight}" xmlns:windows="clr-namespace:System.Windows;assembly=PresentationFramework">
+	<Control.Background>
+		<ImageBrush
+			ImageSource="/Images/backgroundv4.jpg" />
+	</Control.Background>
+	<Viewbox>
+		<Grid>
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="901"
+				Stroke="#00000000"
+				VerticalAlignment="Top"
+				Width="1456"
+				StrokeThickness="0"
+				Margin="-17,-8,0,0" />
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="754"
+				Margin="373,0,0,0"
+				Stroke="#FF000000"
+				VerticalAlignment="Center"
+				Width="12"
+				Fill="#FF03AFEB" />
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="55"
+				Margin="352,40,0,0"
+				Stroke="#FF000000"
+				VerticalAlignment="Top"
+				Width="52"
+				RadiusX="50"
+				RadiusY="50"
+				Fill="#FF03AFEB" />
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="38"
+				Margin="362,194,0,0"
+				Stroke="#FF000000"
+				VerticalAlignment="Top"
+				Width="36"
+				RadiusX="50"
+				RadiusY="50"
+				Fill="#FF03AFEB" />
+			<Rectangle
+				Height="100"
+				Margin="512,174,361,0"
+				VerticalAlignment="Top">
+				<Shape.Fill>
+					<ImageBrush
+						ImageSource="Images/AnswerObstacleRight.png" />
+				</Shape.Fill>
+			</Rectangle>
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="56"
+				Margin="512,131,0,0"
+				VerticalAlignment="Top"
+				Width="260">
+				<Shape.Fill>
+					<ImageBrush
+						ImageSource="Images/NameObstacleRight.png" />
+				</Shape.Fill>
+			</Rectangle>
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="38"
+				Margin="360,367,0,0"
+				Stroke="#FF000000"
+				VerticalAlignment="Top"
+				Width="36"
+				RadiusX="50"
+				RadiusY="50"
+				Fill="#FF03AFEB" />
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="38"
+				Margin="361,537,0,0"
+				Stroke="#FF000000"
+				VerticalAlignment="Top"
+				Width="36"
+				RadiusX="50"
+				RadiusY="50"
+				Fill="#FF03AFEB" />
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="38"
+				Margin="361,705,0,0"
+				Stroke="#FF000000"
+				VerticalAlignment="Top"
+				Width="36"
+				RadiusX="50"
+				RadiusY="50"
+				Fill="#FF03AFEB" />
+			<Grid
+				HorizontalAlignment="Left"
+				VerticalAlignment="Top"
+				Width="101"
+				Margin="405,206,0,0">
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="13,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="26,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="39,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="51,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="64,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="77,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="90,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+			</Grid>
+			<Rectangle
+				Height="100"
+				Margin="512,343,361,0"
+				VerticalAlignment="Top">
+				<Shape.Fill>
+					<ImageBrush
+						ImageSource="/Images/AnswerObstacleRight.png" />
+				</Shape.Fill>
+			</Rectangle>
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="56"
+				Margin="512,301,0,0"
+				VerticalAlignment="Top"
+				Width="260">
+				<Shape.Fill>
+					<ImageBrush
+						ImageSource="/Images/NameObstacleRight.png" />
+				</Shape.Fill>
+			</Rectangle>
+			<Grid
+				HorizontalAlignment="Left"
+				VerticalAlignment="Top"
+				Width="101"
+				Margin="405,375,0,0">
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="13,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="26,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="39,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="51,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="64,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="77,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="90,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+			</Grid>
+			<Rectangle
+				Height="100"
+				Margin="512,516,361,0"
+				VerticalAlignment="Top">
+				<Shape.Fill>
+					<ImageBrush
+						ImageSource="/Images/AnswerObstacleRight.png" />
+				</Shape.Fill>
+			</Rectangle>
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="56"
+				Margin="512,474,0,0"
+				VerticalAlignment="Top"
+				Width="260">
+				<Shape.Fill>
+					<ImageBrush
+						ImageSource="/Images/NameObstacleRight.png" />
+				</Shape.Fill>
+			</Rectangle>
+			<Grid
+				HorizontalAlignment="Left"
+				VerticalAlignment="Top"
+				Width="101"
+				Margin="402,550,0,0">
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="13,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="26,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="39,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="51,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="64,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="77,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="90,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+			</Grid>
+			<Rectangle
+				Height="100"
+				Margin="513,692,361,0"
+				VerticalAlignment="Top">
+				<Shape.Fill>
+					<ImageBrush
+						ImageSource="/Images/AnswerObstacleRight.png" />
+				</Shape.Fill>
+			</Rectangle>
+			<Rectangle
+				HorizontalAlignment="Left"
+				Height="56"
+				Margin="513,650,0,0"
+				VerticalAlignment="Top"
+				Width="260">
+				<Shape.Fill>
+					<ImageBrush
+						ImageSource="/Images/NameObstacleRight.png" />
+				</Shape.Fill>
+			</Rectangle>
+			<Grid
+				HorizontalAlignment="Left"
+				VerticalAlignment="Top"
+				Width="101"
+				Margin="405,718,0,0">
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="13,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="26,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="39,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="51,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Center"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="64,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="77,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+				<Rectangle
+					HorizontalAlignment="Left"
+					Height="11"
+					Margin="90,0,0,0"
+					Stroke="#FFFFFFFF"
+					VerticalAlignment="Top"
+					Width="11"
+					RadiusX="50"
+					RadiusY="50"
+					Fill="#FFFFFFFF" />
+			</Grid>
+			<Viewbox
+				HorizontalAlignment="Left"
+				Height="68"
+				Margin="535,190,0,0"
+				VerticalAlignment="Top"
+				Width="407">
+				<TextBlock
+					Foreground="#FFFFFFFF"
+					FontWeight="Bold"
+					FontSize="47"
+					Text="{Binding FirstAnswer}" />
+			</Viewbox>
+			<Viewbox
+				HorizontalAlignment="Left"
+				Height="68"
+				Margin="535,359,0,0"
+				VerticalAlignment="Top"
+				Width="407">
+				<TextBlock
+					Foreground="#FFFFFFFF"
+					FontWeight="Bold"
+					FontSize="47"
+					Text="{Binding SecondAnswer}" />
+			</Viewbox>
+			<Viewbox
+				HorizontalAlignment="Left"
+				Height="68"
+				Margin="535,537,0,0"
+				VerticalAlignment="Top"
+				Width="407">
+				<TextBlock
+					Foreground="#FFFFFFFF"
+					FontWeight="Bold"
+					FontSize="47"
+					Text="{Binding ThirdAnswer}" />
+			</Viewbox>
+			<Viewbox
+				HorizontalAlignment="Left"
+				Height="68"
+				Margin="535,711,0,0"
+				VerticalAlignment="Top"
+				Width="407">
+				<TextBlock
+					Foreground="#FFFFFFFF"
+					FontWeight="Bold"
+					FontSize="47"
+					Text="{Binding FourthAnswer}" />
+			</Viewbox>
+			<TextBlock
+				TextAlignment="Center"
+				Height="49"
+				Margin="525,134,0,0"
+				TextWrapping="Wrap"
+				VerticalAlignment="Top"
+				Width="212"
+				Foreground="#FFFFFFFF"
+				FontSize="33"
+				HorizontalAlignment="Left"
+				FontWeight="Bold"
+				Text="{Binding FirstName}" />
+			<TextBlock
+				TextAlignment="Center"
+				Height="49"
+				Margin="525,306,0,0"
+				TextWrapping="Wrap"
+				VerticalAlignment="Top"
+				Width="212"
+				Foreground="#FFFFFFFF"
+				FontSize="33"
+				HorizontalAlignment="Left"
+				FontWeight="Bold"
+				Text="{Binding SecondName}" />
+			<TextBlock
+				TextAlignment="Center"
+				Height="49"
+				Margin="529,481,0,0"
+				TextWrapping="Wrap"
+				VerticalAlignment="Top"
+				Width="212"
+				Foreground="#FFFFFFFF"
+				FontSize="33"
+				HorizontalAlignment="Left"
+				FontWeight="Bold"
+				Text="{Binding ThirdName}" />
+			<TextBlock
+				TextAlignment="Center"
+				Height="49"
+				Margin="529,652,0,0"
+				TextWrapping="Wrap"
+				VerticalAlignment="Top"
+				Width="212"
+				Foreground="#FFFFFFFF"
+				FontSize="33"
+				HorizontalAlignment="Left"
+				FontWeight="Bold"
+				Text="{Binding FourthName}" />
+			<TextBlock
+				TextAlignment="Left"
+				HorizontalAlignment="Left"
+				Height="68"
+				Margin="950,190,0,0"
+				TextWrapping="Wrap"
+				VerticalAlignment="Top"
+				Width="131"
+				Foreground="#FFFFFFFF"
+				FontWeight="Bold"
+				FontSize="47"
+				Text="{Binding FirstTime}" />
+			<TextBlock
+				TextAlignment="Left"
+				HorizontalAlignment="Left"
+				Height="68"
+				Margin="950,359,0,0"
+				TextWrapping="Wrap"
+				VerticalAlignment="Top"
+				Width="131"
+				Foreground="#FFFFFFFF"
+				FontWeight="Bold"
+				FontSize="47"
+				Text="{Binding SecondTime}" />
+			<TextBlock
+				TextAlignment="Left"
+				HorizontalAlignment="Left"
+				Height="68"
+				Margin="950,537,0,0"
+				TextWrapping="Wrap"
+				VerticalAlignment="Top"
+				Width="131"
+				Foreground="#FFFFFFFF"
+				FontWeight="Bold"
+				FontSize="47"
+				Text="{Binding ThirdTime}" />
+			<TextBlock
+				TextAlignment="Left"
+				HorizontalAlignment="Left"
+				Height="68"
+				Margin="950,711,0,0"
+				TextWrapping="Wrap"
+				VerticalAlignment="Top"
+				Width="131"
+				Foreground="#FFFFFFFF"
+				FontWeight="Bold"
+				FontSize="47"
+				Text="{Binding FourthTime}" />
+		</Grid>
+	</Viewbox>
+</windows:Window>

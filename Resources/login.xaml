@@ -1,0 +1,106 @@
+﻿<windows:Window
+	x:Class="Olympia_ThiSinh.Login" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="clr-namespace:Olympia_ThiSinh" xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+	Style="{StaticResource MaterialDesignWindow}"
+	TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+	TextElement.FontWeight="Regular"
+	TextElement.FontSize="13"
+	TextOptions.TextFormattingMode="Ideal"
+	TextOptions.TextRenderingMode="Auto"
+	FontFamily="{DynamicResource MaterialDesignFont}"
+	ResizeMode="NoResize"
+	WindowStyle="None"
+	WindowStartupLocation="CenterScreen"
+	AllowsTransparency="True"
+	Title="Login"
+	Height="450"
+	Width="700" xmlns:windows="clr-namespace:System.Windows;assembly=PresentationFramework">
+	<FrameworkElement.Resources>
+		<ResourceDictionary>
+			<Color
+				x:Key="GradientStopColor1">#FFCF6565</Color>
+		</ResourceDictionary>
+	</FrameworkElement.Resources>
+	<Border>
+		<Border.Background>
+			<LinearGradientBrush
+				EndPoint="0.5,1"
+				StartPoint="0.5,0">
+				<GradientStop
+					Color="#FF00DBFE"
+					Offset="1" />
+				<GradientStop
+					Color="#FF003EFE"
+					Offset="0" />
+			</LinearGradientBrush>
+		</Border.Background>
+		<materialDesign:Card
+			Height="300"
+			Width="400">
+			<Grid>
+				<Grid.RowDefinitions>
+					<RowDefinition
+						Height="70" />
+					<RowDefinition />
+					<RowDefinition
+						Height="auto" />
+					<RowDefinition
+						Height="auto" />
+				</Grid.RowDefinitions>
+				<Grid
+					Row="0">
+					<TextBlock
+						Margin="0"
+						FontFamily="Baskerville,Georgia"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center"
+						FontSize="50">Login</TextBlock>
+				</Grid>
+				<StackPanel
+					Grid.Row="1">
+					<TextBox
+						Width="300"
+						FontSize="18"
+						Margin="10 10 10 25"
+						VerticalAlignment="Center"
+						materialDesign:HintAssist.Hint="Nhập tên"
+						Style="{StaticResource MaterialDesignFloatingHintTextBox}" />
+					<TextBox
+						Width="300"
+						FontSize="18"
+						VerticalAlignment="Center"
+						materialDesign:HintAssist.Hint="Nhập IP"
+						Style="{StaticResource MaterialDesignFloatingHintTextBox}" />
+				</StackPanel>
+				<Separator
+					Grid.Row="2"
+					Margin="30 0 30 20" />
+				<Grid
+					Row="3">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition />
+						<ColumnDefinition />
+					</Grid.ColumnDefinitions>
+					<Button
+						HorizontalAlignment="Right"
+						Width="100"
+						Height="36"
+						Grid.Column="0"
+						Content="Vào"
+						Margin="0 0 30 20"
+						Style="{StaticResource MaterialDesignRaisedDarkButton}" />
+					<Button
+						Name="Exit"
+						HorizontalAlignment="Left"
+						Background="#FFFF0000"
+						Grid.Column="1"
+						Width="100"
+						Height="36"
+						Content="Thoát"
+						Margin="30 0 0 20"
+						Style="{StaticResource MaterialDesignRaisedDarkButton}"
+						Click="Exit_Click" />
+				</Grid>
+			</Grid>
+		</materialDesign:Card>
+	</Border>
+</windows:Window>

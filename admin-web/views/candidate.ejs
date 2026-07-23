@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thí sinh - <%= room.room_code %></title>
+  <link rel="stylesheet" href="/public/broadcast.css">
+</head>
+<body class="broadcast client-body">
+  <div class="client-shell candidate-client <%= mode === 'olympia' ? 'olympia-ui' : 'default-ui' %>" id="clientShell">
+    <div class="stage-light"></div>
+
+    <div class="client-window-controls" aria-label="Window controls">
+      <button class="icon-control" id="fullscreenBtn" type="button" title="Toàn màn hình" aria-label="Toàn màn hình">⛶</button>
+      <button class="icon-control" id="miniBtn" type="button" title="Thu gọn" aria-label="Thu gọn">▣</button>
+      <button class="icon-control" id="shrinkBtn" type="button" title="Thu nhỏ" aria-label="Thu nhỏ">_</button>
+    </div>
+
+    <section class="client-login" id="loginPanel">
+      <div class="login-panel glass">
+        <img class="kntech-logo" src="/assets/logo.png" onerror="this.onerror=null;this.src='/assets/KNTech.png';" alt="KNTech">
+        <h1 class="gold-title">OLYMPIA ACADEMIC CHALLENGE</h1>
+        <label class="login-select-label" for="candidateCodeInput">Mã ID thí sinh</label>
+        <input class="login-code-input" id="candidateCodeInput" autocomplete="one-time-code" inputmode="text" placeholder="NHẬP MÃ ID DO ADMIN CẤP">
+        <label class="login-select-label" for="contestantSelect">Danh sách mã ID trong phòng</label>
+        <select id="contestantSelect" required>
+          <option value="">Chọn thí sinh để điền mã ID</option>
+          <% contestants.forEach((c) => { %>
+            <option value="<%= c.id %>"><%= c.seat_no || '' %>. <%= c.display_name %> - <%= c.school || '' %></option>
+          <% }) %>
+        </select>
+        <button class="big-buzzer login-enter" id="enterLobby" type="button">Vào sảnh thi</button>
+        <p class="client-copyright login-copyright">
+          © <%= new Date().getFullYear() %> Bản quyền thuộc về
+          <a href="https://www.facebook.com/it.knz/" target="_blank" rel="noopener">KNTech</a>
+        </p>
+      </div>
+    </section>
+
+    <div class="client-content candidate-content" id="candidateContent">
+      <aside class="classic-scoreboard" id="classicScoreboard"></aside>
+      <div class="stage-round-title">Phần thi: <span id="stageRoundName">Sảnh chờ</span></div>
+
+      <header class="client-topbar">
+        <div class="round-stack">
+          <div class="badge metallic-badge" id="roundBadge">SETUP</div>
+          <div class="room-code"><%= room.room_code %></div>
+        </div>
+
+        <article class="profile-card" id="profileCard">
+          <div class="profile-avatar-wrap">
+            <img class="profile-avatar" id="profileAvatar" src="/public/avatar.svg" alt="">
+            <div class="laurels-icon" id="laurelsIcon" title="Đang dẫn đầu">
+              <span class="laurel-cup" aria-hidden="true"></span>
+            </div>
+          </div>
+          <div class="profile-copy">
+            <div class="profile-name" id="profileName">VIET THAI</div>
+            <div class="profile-school" id="profileSchool">Sảnh chờ</div>
+            <div class="profile-score"><span id="myScore">0</span></div>
+          </div>
+        </article>
+
+        <aside class="buzzer-monitor" id="buzzerMonitor">
+          <div class="buzzer-icon locked" id="buzzerIcon" aria-hidden="true">
+            <span class="lock-shape"></span>
+            <span class="bell-shape"></span>
+          </div>
+          <div>
+            <div class="buzzer-label" id="buzzerLabel">ĐÃ KHÓA</div>
+            <div class="buzzer-sub" id="buzzerSub">Chờ kỹ thuật mở quyền</div>
+          </div>
+        </aside>
+      </header>
+
+      <main class="client-stage-grid">
+        <section class="round-visual-panel" id="roundVisualPanel">
+          <div class="obstacle-client-panel" id="obstaclePanel">
+            <div class="obstacle-image obstacle-mosaic" id="obstacleImage">
+              <% [1,2,3,4].forEach((tile) => { %>
+                <div class="obstacle-strip" data-obstacle-strip="<%= tile %>"><span><%= tile %></span></div>
+              <% }) %>
+            </div>
+            <div class="obstacle-word-panel">
+              <div class="obstacle-word-title" id="obstacleWordTitle">CHƯỚNG NGẠI VẬT</div>
+              <div class="obstacle-word-cells" id="obstacleWordCells"></div>
+              <div class="obstacle-row-markers">
+                <% [1,2,3,4].forEach((row) => { %><span><%= row %></span><% }) %>
+              </div>
+            </div>
+            <div class="speed-answer-board student-answer-board obstacle-answer-board"></div>
+          </div>
+
+          <div class="speed-client-panel" id="speedPanel">
+            <% [
+              ['10s', 'Bản đồ'],
+              ['20s', 'Chân dung'],
+              ['30s', 'Công thức'],
+              ['40s', 'Đồng hồ cát']
+            ].forEach((item, index) => { %>
+              <div class="speed-frame" data-speed-frame="<%= index %>">
+                <div class="speed-art speed-art-<%= index + 1 %>"></div>
+                <strong><%= item[0] %></strong>
+                <span><%= item[1] %></span>
+              </div>
+            <% }) %>
+            <div class="speed-answer-board student-answer-board" id="speedAnswerBoard"></div>
+          </div>
+
+          <div class="finish-client-panel" id="finishPanel">
+            <% [20,30,40].forEach((point) => { %>
+              <div class="finish-package-card" data-finish-package="<%= point %>"><span><%= point %></span></div>
+            <% }) %>
+          </div>
+        </section>
+
+        <section class="question-box client-question-box" id="questionBox">
+          <div class="hope-star" id="hopeStar" title="Ngôi sao hy vọng"></div>
+          <div class="lobby-mark" id="lobbyMark">SẢNH CHỜ</div>
+          <div class="question-text" id="questionText">Đang chờ kỹ thuật...</div>
+          <div class="answer-reveal" id="answerReveal"></div>
+          <div id="wallPanel" class="wall-panel">
+            <div id="wallCells" class="wall-cells"></div>
+            <button class="big-buzzer" id="submitWall" type="button">Gửi nhóm 4 ô</button>
+          </div>
+          <div class="timer-shell client-timer"><div class="timer-bar" id="timerBar"></div></div>
+        </section>
+
+        <aside class="candidate-timer-panel">
+          <div class="timer-orb" id="timerOrb">0</div>
+          <div class="timer-caption">Đồng hồ</div>
+        </aside>
+      </main>
+
+      <form class="answer-area candidate-answer-area" id="answerForm">
+        <input id="answerInput" autocomplete="off" placeholder="NHẬP ĐÁP ÁN" autofocus>
+        <button class="big-buzzer submit-answer" id="submitBtn" type="submit">Trả lời</button>
+        <button class="big-buzzer obstacle-buzzer" id="buzzBtn" type="button">ANSWER OBSTACLE</button>
+      </form>
+      <div class="client-status" id="clientStatus"></div>
+      <footer class="client-copyright">
+        © <%= new Date().getFullYear() %> Bản quyền thuộc về
+        <a href="https://www.facebook.com/it.knz/" target="_blank" rel="noopener">KNTech</a>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    window.ROOM_CODE = "<%= room.room_code %>";
+    window.CLIENT_MODE = "<%= mode %>";
+  </script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/public/realtime-client.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const storageKey = `olympia:candidate:${window.ROOM_CODE}`;
+    const loginCodeStorageKey = `olympia:candidate-code:${window.ROOM_CODE}`;
+    const preloaded = new Map();
+    let selectedWallCells = [];
+    let lastSpeedFrame = -1;
+    let loggedInCandidate = null;
+
+    function selectedContestantId() {
+      return Number(loggedInCandidate?.id || 0);
+    }
+
+    function selectedCandidate(state) {
+      const id = selectedContestantId();
+      return (state.candidates || []).find((candidate) => (
+        Number(candidate.id) === id &&
+        (candidate.is_active === undefined || candidate.is_active === true || Number(candidate.is_active) === 1)
+      ));
+    }
+
+    function isBuzzRound(state) {
+      return ["obstacle", "finish", "tie_breaker", "jeopardy"].includes(state.round) || (state.round === "warmup" && state.warmup?.mode === "common");
+    }
+
+    function canBuzz(state, mine) {
+      if (!mine || !isBuzzRound(state)) return false;
+      const status = state.ring?.lastStatus?.[mine.id];
+      if (status === "foul" || status === "accepted" || Number(state.ring?.firstContestantId || 0) === Number(mine.id)) return false;
+      if (state.round === "tie_breaker" && state.tieBreaker?.armed === false) return true;
+      if (state.ring?.locked) return false;
+      if (state.ring?.firstContestantId && Number(state.ring.firstContestantId) !== Number(mine.id)) return false;
+      return true;
+    }
+
+    function canAnswer(state, mine, buzzer) {
+      if (!mine || !state.question?.visible || buzzer?.isFoul || !state.timer?.running) return false;
+      const id = Number(mine.id);
+      const firstId = Number(state.ring?.firstContestantId || 0);
+      if (state.round === "warmup") {
+        if (state.warmup?.mode === "common") return firstId === id;
+        return !state.warmup?.activeContestantId || Number(state.warmup.activeContestantId) === id;
+      }
+      if (state.round === "speed" || state.round === "obstacle") return true;
+      if (state.round === "finish") {
+        const activeId = Number(state.finish?.activeContestantId || 0);
+        const isMain = activeId === id && !state.finish?.stealMode;
+        const isSteal = firstId === id && id !== activeId;
+        return isMain || isSteal;
+      }
+      if (state.round === "tie_breaker" || state.round === "jeopardy") return firstId === id;
+      return state.round === "connecting_wall";
+    }
+
+    function candidateLogin(code) {
+      const loginCode = String(code || $("candidateCodeInput").value || "").trim();
+      if (!loginCode) return;
+      $("clientStatus").textContent = "Đang đăng nhập...";
+      OlympiaSocket.loginCandidate(loginCode);
+    }
+
+    function roundLabel(round) {
+      return {
+        setup: "LOBBY",
+        warmup: "KHỞI ĐỘNG",
+        obstacle: "VƯỢT CHƯỚNG NGẠI VẬT",
+        speed: "TĂNG TỐC",
+        finish: "VỀ ĐÍCH",
+        tie_breaker: "CÂU HỎI PHỤ",
+        jeopardy: "MVT JEOPARDY",
+        connecting_wall: "CONNECTING WALL",
+        summary: "TỔNG KẾT",
+      }[round] || String(round || "setup").toUpperCase();
+    }
+
+    function preload(urls) {
+      (urls || []).forEach((url) => {
+        if (!url || preloaded.has(url)) return;
+        const img = new Image();
+        img.src = url;
+        preloaded.set(url, img);
+      });
+    }
+
+    function setLoginVisible(show) {
+      $("loginPanel").classList.toggle("hidden", !show);
+      $("candidateContent").classList.toggle("locked-lobby", show);
+    }
+
+    function updateBuzzerState(state, mine) {
+      const selectedId = mine ? Number(mine.id) : selectedContestantId();
+      const ringStatus = state.ring?.lastStatus?.[selectedId];
+      const hasTriggered = ringStatus === "accepted" || Number(state.ring?.firstContestantId) === selectedId;
+      const isFoul = state.round === "tie_breaker" && ringStatus === "foul";
+      const isLocked = Boolean(state.ring?.locked) && !hasTriggered && !isFoul;
+      const icon = $("buzzerIcon");
+      icon.classList.toggle("locked", isLocked);
+      icon.classList.toggle("active", !state.ring?.locked && !hasTriggered && !isFoul);
+      icon.classList.toggle("triggered", hasTriggered);
+      icon.classList.toggle("foul", isFoul);
+      $("buzzerLabel").textContent = isFoul ? "PHẠM QUY" : hasTriggered ? "ĐÃ BẤM" : isLocked ? "ĐÃ KHÓA" : "SẴN SÀNG";
+      $("buzzerSub").textContent = isFoul ? "Mất quyền trả lời câu này" : hasTriggered ? "Đã giành quyền trả lời" : isLocked ? "Chuông đang khóa" : "Sẵn sàng bấm chuông";
+      return { ringStatus, isFoul, hasTriggered };
+    }
+
+    function timerPercent(state) {
+      const total = Number(state.timer?.seconds || 0);
+      const remaining = Number(state.timer?.remaining || 0);
+      return total > 0 ? Math.max(0, Math.min(100, remaining / total * 100)) : 100;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      }[char]));
+    }
+
+    function candidateName(id, state) {
+      return (state.candidates || []).find((candidate) => Number(candidate.id) === Number(id))?.display_name || "Empty";
+    }
+
+    function currentAnswers(state) {
+      const key = state.question?.key || "";
+      return [...(state.answers || [])]
+        .filter((answer) => !key || !answer.question_key || answer.question_key === key)
+        .sort((a, b) => Number(a.elapsed_ms ?? 999999999) - Number(b.elapsed_ms ?? 999999999));
+    }
+
+    function renderClassicScores(state) {
+      const board = $("classicScoreboard");
+      const candidates = (state.candidates || []).slice(0, state.scoring?.candidateCount || 4);
+      board.innerHTML = candidates.map((candidate, index) => `
+        <div class="classic-score-row ${index === 0 ? "lead" : ""}">
+          <strong>${escapeHtml(candidate.display_name || "Empty")}</strong>
+          <span>${Number(candidate.score || 0)}</span>
+        </div>
+      `).join("");
+    }
+
+    function renderTimerOrb(state) {
+      $("timerOrb").textContent = Number(state.timer?.remaining ?? state.timer?.seconds ?? 0);
+    }
+
+    function renderAnswerBoard(state) {
+      const rows = currentAnswers(state);
+      const visible = Boolean(state.ui?.showCandidateAnswers) && rows.length > 0;
+      const html = visible ? rows.map((answer, index) => `
+          <div class="response-lane">
+            <span class="response-dot">${index + 1}</span>
+            <strong>${escapeHtml(candidateName(answer.contestant_id, state))}</strong>
+            <em>${escapeHtml(answer.answer_text)}</em>
+            <b>${answer.elapsed_ms == null ? "" : (Number(answer.elapsed_ms) / 1000).toFixed(2)}</b>
+          </div>
+        `).join("") : "";
+      document.querySelectorAll(".student-answer-board").forEach((board) => {
+        board.classList.toggle("active", visible);
+        board.innerHTML = html;
+      });
+    }
+
+    function renderObstacleWord(state) {
+      const answer = String(state.question?.answer || "").trim();
+      const letters = answer.replace(/\s+/g, "").split("");
+      const count = letters.length || Number(state.puzzle?.cellCount || 0) || 7;
+      $("obstacleWordTitle").textContent = `CHƯỚNG NGẠI VẬT CÓ ${count} CHỮ CÁI`;
+      const showLetters = Boolean(state.question?.answerVisible);
+      $("obstacleWordCells").innerHTML = Array.from({ length: count }, (_, index) => {
+        const letter = letters[index] || "";
+        return `<span class="${showLetters && letter ? "filled" : ""}">${showLetters ? escapeHtml(letter.toUpperCase()) : ""}</span>`;
+      }).join("");
+    }
+
+    function renderObstacle(state) {
+      const panel = $("obstaclePanel");
+      panel.classList.toggle("active", state.round === "obstacle");
+      const imageUrl = state.puzzle?.imageUrl || state.question?.mediaUrl || "";
+      $("obstacleImage").style.backgroundImage = imageUrl ? `linear-gradient(rgba(1,4,9,.35), rgba(1,4,9,.35)), url("${imageUrl}")` : "";
+      document.querySelectorAll("[data-obstacle-strip]").forEach((strip, index) => {
+        strip.classList.toggle("revealed", Boolean(state.puzzle?.revealed?.[index]));
+      });
+      renderObstacleWord(state);
+    }
+
+    function renderSpeed(state) {
+      const panel = $("speedPanel");
+      panel.classList.toggle("active", state.round === "speed");
+      panel.classList.toggle("answers-active", Boolean(state.ui?.showCandidateAnswers && currentAnswers(state).length));
+      const sequence = state.speed?.imageSequence || [];
+      preload(sequence);
+      const total = Number(state.timer?.seconds || 0);
+      const remaining = Number(state.timer?.remaining || total);
+      const elapsed = Math.max(0, total - remaining);
+      const frame = total > 0 ? Math.min(3, Math.floor(elapsed / Math.max(1, total / 4))) : Math.max(0, Number(state.speed?.questionIndex || 1) - 1);
+      if (frame !== lastSpeedFrame) lastSpeedFrame = frame;
+      document.querySelectorAll("[data-speed-frame]").forEach((card, index) => {
+        const url = sequence[index];
+        card.classList.toggle("active", index === frame);
+        if (url) {
+          card.style.backgroundImage = `linear-gradient(rgba(2,6,23,.18), rgba(2,6,23,.55)), url("${url}")`;
+          card.classList.add("has-media");
+        } else {
+          card.style.backgroundImage = "";
+          card.classList.remove("has-media");
+        }
+      });
+      renderAnswerBoard(state);
+    }
+
+    function renderFinish(state, mine) {
+      const panel = $("finishPanel");
+      panel.classList.toggle("active", state.round === "finish");
+      const activePoint = Number(state.finish?.activePackagePoints || state.question?.point || 0);
+      const available = new Set((state.finish?.packagePoints || [20, 40]).map(Number));
+      document.querySelectorAll("[data-finish-package]").forEach((card) => {
+        const point = Number(card.dataset.finishPackage);
+        card.classList.toggle("active", point === activePoint);
+        card.classList.toggle("disabled", !available.has(point));
+      });
+      $("hopeStar").classList.toggle("active", state.round === "finish" && Boolean(state.question?.starEnabled));
+      const leaderScore = Math.max(0, ...(state.candidates || []).map((c) => Number(c.score || 0)));
+      $("laurelsIcon").classList.toggle("active", Boolean(mine) && Number(mine.score || 0) === leaderScore && leaderScore > 0);
+    }
+
+    function renderWall(state) {
+      $("wallPanel").style.display = state.round === "connecting_wall" ? "block" : "none";
+      if (state.round !== "connecting_wall") return;
+      const solved = new Set((state.connectingWall?.solvedGroups || []).flatMap((group) => group.cellIds || []));
+      $("wallCells").innerHTML = (state.connectingWall?.cells || []).map((cell) => {
+        const selected = selectedWallCells.includes(cell.id);
+        const isSolved = solved.has(cell.id);
+        return `<button type="button" class="btn ${isSolved ? 'success' : selected ? 'warning' : ''}" data-wall-cell="${cell.id}" ${isSolved ? 'disabled' : ''}>${cell.word_text}</button>`;
+      }).join("");
+      document.querySelectorAll("[data-wall-cell]").forEach((button) => button.onclick = () => {
+        const id = Number(button.dataset.wallCell);
+        selectedWallCells = selectedWallCells.includes(id) ? selectedWallCells.filter((item) => item !== id) : selectedWallCells.concat(id).slice(-4);
+        window.renderRealtimeState(OlympiaSocket.getState());
+      });
+    }
+
+    window.renderRealtimeState = function (state) {
+      const mine = selectedCandidate(state);
+      setLoginVisible(!mine);
+
+      $("roundBadge").textContent = roundLabel(state.round);
+      $("stageRoundName").textContent = roundLabel(state.round);
+      renderClassicScores(state);
+      renderTimerOrb(state);
+      $("profileName").textContent = mine ? mine.display_name : "VIET THAI";
+      $("profileSchool").textContent = mine ? (mine.school || "Thí sinh") : "Sảnh chờ";
+      $("myScore").textContent = mine ? mine.score : "0";
+      $("profileAvatar").src = mine?.avatar_url || "/public/avatar.svg";
+      $("profileAvatar").onerror = function () { this.src = "/public/avatar.svg"; };
+
+      const questionVisible = Boolean(state.question?.visible);
+      $("lobbyMark").classList.toggle("active", !questionVisible || state.round === "setup");
+      $("questionText").textContent = questionVisible ? (state.question.text || "Đang chờ câu hỏi...") : "Đang chờ kỹ thuật...";
+      $("answerReveal").style.display = state.question?.answerVisible ? "block" : "none";
+      $("answerReveal").textContent = state.question?.answer ? `Đáp án: ${state.question.answer}` : "";
+
+      const buzzer = updateBuzzerState(state, mine);
+      $("answerForm").classList.toggle("locked", Boolean(state.ring?.locked));
+      const showBuzzer = isBuzzRound(state);
+      $("buzzBtn").style.display = showBuzzer ? "inline-block" : "none";
+      $("buzzBtn").textContent = state.round === "tie_breaker" ? "Bấm chuông câu hỏi phụ" : state.round === "finish" ? "Giành quyền cướp điểm" : state.round === "warmup" ? "Bấm chuông Khởi động" : "ANSWER OBSTACLE";
+
+      const isFinishMain = state.round === "finish" && mine && Number(state.finish?.activeContestantId) === Number(mine.id) && !state.finish?.stealMode;
+      const answerOpen = canAnswer(state, mine, buzzer);
+      const buzzOpen = canBuzz(state, mine);
+      $("answerInput").disabled = !answerOpen;
+      $("submitBtn").disabled = !answerOpen;
+      $("buzzBtn").disabled = !buzzOpen;
+      $("clientStatus").textContent = buzzer.isFoul ? "PHẠM QUY - mất quyền trả lời câu này" : buzzer.hasTriggered ? "Đã giành quyền trả lời, nhập đáp án khi admin mở giờ" : isFinishMain ? "Đáp án cuối cùng sẽ được ghi nhận khi admin mở giờ" : !mine ? "Chưa đăng nhập mã ID thí sinh" : "";
+      $("clientStatus").classList.toggle("foul-text", buzzer.isFoul);
+
+      const pct = timerPercent(state);
+      $("timerBar").style.width = `${pct}%`;
+      $("timerBar").classList.toggle("warn", pct <= 50 && pct > 25);
+      $("timerBar").classList.toggle("danger", pct <= 25);
+
+      renderObstacle(state);
+      renderSpeed(state);
+      renderFinish(state, mine);
+      renderWall(state);
+      renderAnswerBoard(state);
+      if (answerOpen && document.activeElement !== $("contestantSelect") && document.activeElement !== $("candidateCodeInput")) $("answerInput").focus();
+    };
+
+    $("contestantSelect").addEventListener("change", () => {
+      if ($("contestantSelect").value) $("candidateCodeInput").value = $("contestantSelect").value;
+    });
+
+    window.handleCandidateLoginOk = ({ contestant }) => {
+      loggedInCandidate = contestant;
+      localStorage.setItem(storageKey, String(contestant.id));
+      localStorage.setItem(loginCodeStorageKey, $("candidateCodeInput").value.trim() || String(contestant.id));
+      setLoginVisible(false);
+      window.renderRealtimeState(OlympiaSocket.getState());
+    };
+
+    window.handleCandidateLoginError = (message) => {
+      loggedInCandidate = null;
+      localStorage.removeItem(storageKey);
+      localStorage.removeItem(loginCodeStorageKey);
+      $("clientStatus").textContent = message || "Mã ID không hợp lệ.";
+      alert(message || "Mã ID không hợp lệ.");
+      setLoginVisible(true);
+      $("candidateCodeInput").focus();
+    };
+
+    window.handleStateInitialized = () => {
+      const storedCode = localStorage.getItem(loginCodeStorageKey) || localStorage.getItem(storageKey);
+      if (storedCode && !loggedInCandidate) {
+        $("candidateCodeInput").value = storedCode;
+        candidateLogin(storedCode);
+      }
+    };
+
+    $("candidateCodeInput").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        candidateLogin();
+      }
+    });
+
+    $("enterLobby").onclick = () => {
+      candidateLogin();
+    };
+
+    $("answerInput").addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      const state = OlympiaSocket.getState();
+      const mine = selectedCandidate(state);
+      if (canBuzz(state, mine) && !$("answerInput").value.trim()) {
+        event.preventDefault();
+        event.stopPropagation();
+        OlympiaSocket.buzz(Number(mine.id));
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.repeat) return;
+      if (document.activeElement === $("candidateCodeInput") || document.activeElement === $("contestantSelect")) return;
+      if (document.activeElement === $("answerInput") && $("answerInput").value.trim()) return;
+      const state = OlympiaSocket.getState();
+      const mine = selectedCandidate(state);
+      if (canBuzz(state, mine)) {
+        event.preventDefault();
+        OlympiaSocket.buzz(Number(mine.id));
+      }
+    });
+
+    $("answerForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const contestantId = selectedContestantId();
+      const answerText = $("answerInput").value.trim();
+      if (!contestantId || !answerText) return;
+      const state = OlympiaSocket.getState();
+      const mine = selectedCandidate(state);
+      const buzzer = updateBuzzerState(state, mine);
+      if (!canAnswer(state, mine, buzzer)) return;
+      const isFinishMain = state.round === "finish" && Number(state.finish?.activeContestantId) === contestantId && !state.finish?.stealMode;
+      if (state.round === "tie_breaker" && state.ring?.lastStatus?.[contestantId] === "foul") return;
+      OlympiaSocket.submitAnswer(contestantId, answerText);
+      if (!isFinishMain && state.round !== "warmup") $("submitBtn").disabled = true;
+      if (!isFinishMain) $("answerInput").value = "";
+      setTimeout(() => {
+        if (!isFinishMain && OlympiaSocket.getState().ring?.lastStatus?.[contestantId] !== "foul") $("submitBtn").disabled = false;
+        $("answerInput").focus();
+      }, 700);
+    });
+
+    $("buzzBtn").onclick = () => {
+      const contestantId = selectedContestantId();
+      const state = OlympiaSocket.getState();
+      const mine = selectedCandidate(state);
+      if (contestantId && canBuzz(state, mine)) OlympiaSocket.buzz(contestantId);
+    };
+
+    $("submitWall").onclick = () => {
+      const contestantId = selectedContestantId();
+      const state = OlympiaSocket.getState();
+      if (!contestantId || selectedWallCells.length !== 4 || state.round !== "connecting_wall" || !state.timer?.running) return alert("Admin chưa mở quyền hoặc chưa chọn đúng 4 ô.");
+      OlympiaSocket.submitWall(contestantId, selectedWallCells);
+      selectedWallCells = [];
+    };
+
+    $("fullscreenBtn").onclick = async () => {
+      const shell = $("clientShell");
+      if (!document.fullscreenElement) await shell.requestFullscreen?.();
+      else await document.exitFullscreen?.();
+    };
+
+    $("miniBtn").onclick = () => {
+      $("clientShell").classList.toggle("mini-mode");
+    };
+
+    $("shrinkBtn").onclick = () => {
+      $("clientShell").classList.add("mini-mode");
+      try {
+        window.resizeTo(460, 320);
+        window.moveTo(screen.availWidth - 480, screen.availHeight - 360);
+      } catch (error) {
+        console.debug(error);
+      }
+    };
+
+    window.addEventListener("load", () => {
+      const storedCode = localStorage.getItem(loginCodeStorageKey) || localStorage.getItem(storageKey);
+      if (storedCode) {
+        $("candidateCodeInput").value = storedCode;
+      } else {
+        $("candidateCodeInput").focus();
+      }
+    });
+  </script>
+</body>
+</html>
